@@ -430,7 +430,7 @@ const S = {
   rows: new Map(),        // peerId -> linha da lista de pessoas (atualizada no lugar)
   meters: new Map(),      // peerId|'me' -> medidor de volume da voz
   vol: new Map(),         // peerId -> volume escolhido (0..1)
-  tab: 'people', panelOpen: true, unread: 0, inviteDismissed: false, quality: 'nitidez', lowFps: 0, send: null,
+  tab: 'people', panelOpen: true, unread: 0, inviteDismissed: false, quality: 'nitidez', lowFps: 0, lowSrc: 0, send: null,
   stageKey: null, joinTimer: null, screenVol: 1,
 };
 
@@ -1439,6 +1439,7 @@ function renderLabel() {
     // quem apresenta vê o que está saindo de verdade e o que está segurando a qualidade
     const s = S.send;
     text = 'Você está apresentando · enviando ' + (s.w ? `${s.w}×${s.h} ` : '') + `${s.fps} qps`
+      + (s.src != null && s.src < QUALITY[S.quality].maxFramerate * 0.8 ? ` · a captura entrega só ${s.src} qps` : '')
       + (s.scaled ? ' · resolução reduzida para manter os quadros' : '')
       + (s.limit === 'bandwidth' ? ' · limitado pela internet' : s.limit === 'cpu' ? ' · limitado pelo processador' : '')
       + (s.hw === false ? ' · codificando no processador' : '');
@@ -1458,9 +1459,10 @@ async function updateSendStats() {
     if (!key.startsWith('screen:') || !call.peerConnection) continue;
     try {
       const st = await call.peerConnection.getStats();
-      let out = null, availKbps = null;
+      let out = null, availKbps = null, srcFps = null;
       st.forEach(r => {
         if (r.type === 'outbound-rtp' && r.kind === 'video') out = r;
+        if (r.type === 'media-source' && r.kind === 'video' && r.framesPerSecond != null) srcFps = r.framesPerSecond; // o que a captura entrega
         if (r.type === 'transport' && r.selectedCandidatePairId) {
           const pair = st.get(r.selectedCandidatePairId);
           if (pair && pair.availableOutgoingBitrate) availKbps = pair.availableOutgoingBitrate / 1000;
@@ -1468,11 +1470,20 @@ async function updateSendStats() {
       });
       if (!out) continue;
       const s = { w: out.frameWidth, h: out.frameHeight, fps: Math.round(out.framesPerSecond || 0), limit: out.qualityLimitationReason, hw: out.powerEfficientEncoder };
-      s.scaled = adaptScreen(call, out, availKbps) > 0;
+      s.scaled = adaptScreen(call, out, availKbps, srcFps) > 0;
+      s.src = srcFps != null ? Math.round(srcFps) : null;
       if (!worst || s.fps < worst.fps) worst = s;
     } catch {}
   }
   S.send = worst;
+  // a captura entrega poucos quadros: nada na transmissão resolve, então avisa o que costuma causar isso
+  const target = QUALITY[S.quality].maxFramerate;
+  if (worst && worst.src != null && worst.src < target * 0.8) {
+    if (++S.lowSrc === 4 && !S.srcTipShown) {
+      S.srcTipShown = true;
+      toast(`A captura da tela está entregando só ${worst.src} quadros/s, antes de qualquer envio. Capture a “Tela inteira” (não a janela do jogo), deixe o jogo em janela sem bordas e confira se o jogo passa de ${target} fps.`, 14000);
+    }
+  } else S.lowSrc = 0;
   if (worst && QUALITY[S.quality].degradation === 'maintain-resolution' && worst.limit && worst.limit !== 'none' && worst.fps < 18) {
     if (++S.lowFps === 3 && !S.tipShown) {
       S.tipShown = true;
@@ -1483,13 +1494,14 @@ async function updateSendStats() {
 }
 /*
   Ajuste automático de resolução nos modos de jogo (maintain-framerate).
-  O codificador por hardware (H.264) não baixa a resolução sozinho: quando bate no teto de bitrate
-  (do modo ou da internet), ele descarta quadros, e a imagem fica "em quadros". Aqui, se os qps caem e o
-  envio está encostado no limite, a resolução desce um degrau; com folga por um tempo, sobe de novo.
-  Cada pessoa assistindo tem o seu codificador, então o ajuste é por chamada.
+  O codificador por hardware (H.264) não baixa a resolução sozinho: quando falta bitrate (do modo ou da
+  internet), ele descarta quadros, e a imagem fica "em quadros". Aqui, se a captura entrega quadros
+  suficientes mas o envio sai com bem menos, a resolução desce um degrau; com folga, sobe de novo.
+  Se quem limita é a própria captura (srcFps baixo), baixar a resolução não ajuda: não desce, e volta a
+  subir se já tinha descido. Cada pessoa assistindo tem o seu codificador, então o ajuste é por chamada.
 */
 const SCALE_STEPS = [1, 1.25, 1.5, 2]; // 1080p → 864p → 720p → 540p (1440p → 1152p → 960p → 720p)
-function adaptScreen(call, out, availKbps) {
+function adaptScreen(call, out, availKbps, srcFps) {
   const ad = call._ad;
   const q = QUALITY[S.quality];
   if (!ad) return 0;
@@ -1504,13 +1516,17 @@ function adaptScreen(call, out, availKbps) {
   if (ad.cool > 0) { ad.cool--; return ad.step; }
   const limitKbps = Math.min(q.maxBitrate / 1000, availKbps || Infinity);
   const fps = out.framesPerSecond, target = q.maxFramerate;
-  const choked = fps < target * 0.8 && kbps > limitKbps * 0.8; // perdendo quadros por falta de bitrate
-  const roomy = fps >= target * 0.9 && kbps < limitKbps * 0.55; // sobrando bastante
+  const src = srcFps != null ? srcFps : null;
+  const sourceLimited = src != null && src < target * 0.8;            // a captura não entrega o alvo
+  const lagging = fps < (src != null ? Math.min(src, target) : target) * 0.8; // o envio fica bem abaixo do que chega
+  // sem o dado da captura (outros navegadores), só desce se o navegador disser que falta internet
+  const choked = !sourceLimited && lagging && (src != null || out.qualityLimitationReason === 'bandwidth');
+  const roomy = !lagging && (sourceLimited || kbps < limitKbps * 0.55);
   ad.low = choked ? ad.low + 1 : 0;
   ad.high = roomy ? ad.high + 1 : 0;
   let next = ad.step;
-  if (ad.low >= 2 && ad.step < SCALE_STEPS.length - 1) next = ad.step + 1; // ~4 s travando: desce
-  else if (ad.high >= 8 && ad.step > 0) next = ad.step - 1;                // ~16 s folgado: sobe
+  if (ad.low >= 2 && ad.step < SCALE_STEPS.length - 1) next = ad.step + 1;                // ~4 s travando: desce
+  else if (ad.high >= (sourceLimited ? 2 : 8) && ad.step > 0) next = ad.step - 1;           // folgado (ou inútil): sobe
   if (next !== ad.step) {
     ad.step = next; ad.low = 0; ad.high = 0; ad.cool = 2;
     call.peerConnection.getSenders().forEach(s => tuneSender(s, SCALE_STEPS[next]));

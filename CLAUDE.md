@@ -40,8 +40,9 @@ textos de interface, comentários e commits são em português.
   `screenSdp` (H.264 primeiro, bitrate inicial), `tuneSender`/`tuneCall`/`retuneAll` (bitrate e
   `degradationPreference`), `setQuality`, `dropAudio`, `startPresenting`, `stopPresenting`,
   `adaptScreen` (fica perto de `renderCams`; nos modos de jogo desce `scaleResolutionDownBy` em
-  degraus `SCALE_STEPS` quando os qps caem encostados no teto, porque o H.264 por hardware descarta
-  quadros em vez de baixar a resolução),
+  degraus `SCALE_STEPS` só quando a captura entrega o alvo (stat `media-source`) e o envio sai bem
+  abaixo dela, porque o H.264 por hardware descarta quadros em vez de baixar a resolução. Se a própria
+  captura é que entrega poucos qps, não mexe e avisa. Medição ao vivo de jogo: captura ~20 qps),
   `toggleMic`, `toggleCam`, `stopCam`.
 - **tela cheia / painel / chat:** `toggleFullscreen`, `openPanel`, `addChat`, `addSystem`, `appendMsg`.
 - **imagens no chat:** `sendImage`, `shrinkImage` (até 1920 px, WebP), `onImagePart`, `openLightbox`.
