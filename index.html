@@ -116,6 +116,16 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
 .tb:disabled{opacity:.4;cursor:default}
 .sep{width:1px;height:28px;background:var(--border);margin:0 4px}
 .badge{position:absolute;top:-2px;right:-2px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--accent);color:var(--accent-ink);font-size:11px;font-weight:700;display:grid;place-items:center}
+.qwrap{position:relative}
+.qmenu{position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);width:290px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:8px;box-shadow:0 10px 30px rgba(0,0,0,.45);z-index:15}
+.qhead{font-size:12px;color:var(--muted);padding:6px 10px 8px}
+.qfoot{font-size:12px;color:var(--muted);padding:8px 10px 4px;border-top:1px solid var(--border);margin-top:6px}
+.qopt{display:block;width:100%;text-align:left;padding:10px;border-radius:10px}
+.qopt:hover{background:var(--surface-2)}
+.qopt b{display:block;font-weight:600}
+.qopt span{display:block;font-size:13px;color:var(--muted)}
+.qopt[aria-checked=true]{background:var(--surface-2);box-shadow:inset 3px 0 0 var(--accent)}
+.qopt[aria-checked=true] b{color:var(--accent)}
 .count{font-size:12px;font-weight:700;position:absolute;bottom:4px;right:6px}
 
 .toast-wrap{position:fixed;left:50%;top:16px;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:20;width:min(520px,calc(100% - 32px));pointer-events:none}
@@ -132,6 +142,7 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
   .tb.wide .lbl{display:none}
   .tb.wide{padding:0 13px}
   .sep{display:none}
+  .qmenu{position:fixed;left:16px;right:16px;bottom:84px;width:auto;transform:none}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -153,7 +164,8 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
   <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
   <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12 20 4l-6 16-3-7z"/></symbol>
-  <symbol id="i-vol" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></symbol>
+  <symbol id="i-hd" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9v6M10 9v6M6 12h4M14 9v6h1.5a3 3 0 0 0 0-6z"/></symbol>
+  <symbol id="i-vol"viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></symbol>
 </svg>
 
 <!-- ===== início ===== -->
@@ -250,6 +262,15 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
   <nav class="toolbar" aria-label="Controles">
     <button class="tb off" id="btn-mic" type="button" aria-label="Ligar microfone" title="Ligar microfone"><svg><use href="#i-mic-off"/></svg></button>
     <button class="tb wide" id="btn-share" type="button"><svg><use href="#i-screen"/></svg><span class="lbl">Apresentar</span></button>
+    <div class="qwrap">
+      <button class="tb" id="btn-quality" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Qualidade da imagem" title="Qualidade da imagem"><svg><use href="#i-hd"/></svg></button>
+      <div class="qmenu" id="qmenu" role="menu" hidden>
+        <div class="qhead">Qualidade de quando você apresenta</div>
+        <button class="qopt" role="menuitemradio" data-q="nitidez" type="button"><b>Nitidez</b><span></span></button>
+        <button class="qopt" role="menuitemradio" data-q="fluidez" type="button"><b>Fluidez</b><span></span></button>
+        <div class="qfoot">A imagem melhora sozinha nos primeiros segundos. Internet lenta de quem apresenta ou de quem assiste reduz a qualidade.</div>
+      </div>
+    </div>
     <button class="tb" id="btn-full" type="button" aria-label="Tela cheia" title="Tela cheia"><svg><use href="#i-full"/></svg></button>
     <span class="sep"></span>
     <button class="tb" id="btn-people" type="button" aria-label="Pessoas" title="Pessoas"><svg><use href="#i-people"/></svg><span class="count" id="count">1</span></button>
@@ -278,6 +299,20 @@ const ICE = [
   { urls: 'stun:stun.cloudflare.com:3478' },
 ];
 const PEER_OPTS = { config: { iceServers: ICE }, debug: 1 };
+// Qualidade da transmissão. "Nitidez" guarda a resolução (texto legível); "Fluidez" guarda os quadros por segundo.
+const QUALITY = {
+  nitidez: {
+    title: 'Nitidez', desc: 'Para texto, código e planilhas. Até 1440p, 30 quadros/s.',
+    hint: 'detail', degradation: 'maintain-resolution', maxBitrate: 6_000_000, maxFramerate: 30,
+    video: { width: { ideal: 2560 }, height: { ideal: 1440 }, frameRate: { ideal: 30, max: 30 } },
+  },
+  fluidez: {
+    title: 'Fluidez', desc: 'Para jogos e vídeos. 1080p, até 60 quadros/s.',
+    hint: 'motion', degradation: 'maintain-framerate', maxBitrate: 8_000_000, maxFramerate: 60,
+    video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 60, max: 60 } },
+  },
+};
+const SCREEN_AUDIO_BITRATE = 128_000; // som do PC em estéreo (o padrão do WebRTC é ~32 kbps, mono)
 const CODE_ALPHABET = 'abcdefghijkmnpqrstuvwxyz23456789'; // 32 símbolos, sem 0/1/l/o
 const CODE_RE = /^[a-z0-9]{24}$/;
 const COLORS = ['#8ab4f8', '#f28b82', '#fdd663', '#81c995', '#c58af9', '#78d9ec', '#fcad70', '#ff8bcb'];
@@ -290,7 +325,7 @@ const S = {
   outCalls: new Map(),     // `${tipo}:${peerId}` -> MediaConnection
   screen: null, mic: null, micOn: false,
   hostReached: false, active: false, hostRetries: 0,
-  tab: 'people', panelOpen: true, unread: 0, inviteDismissed: false,
+  tab: 'people', panelOpen: true, unread: 0, inviteDismissed: false, quality: 'nitidez',
   stageKey: null, joinTimer: null,
 };
 
@@ -584,10 +619,13 @@ function callMember(m, kind) {
   const stream = kind === 'screen' ? S.screen : S.mic;
   if (!stream || !S.peer) return;
   closeOut(kind, m.id);
-  const call = S.peer.call(m.id, stream, { metadata: { kind } });
+  const opts = { metadata: { kind } };
+  if (kind === 'screen') opts.sdpTransform = hifiAudio;
+  const call = S.peer.call(m.id, stream, opts);
   if (!call) return;
   const key = kind + ':' + m.id;
   S.outCalls.set(key, call);
+  if (kind === 'screen') tuneCall(call);
   call.on('close', () => { if (S.outCalls.get(key) === call) S.outCalls.delete(key); });
   call.on('error', () => {});
 }
@@ -609,7 +647,8 @@ function onCall(call) {
 function acceptCall(m, call) {
   const kind = call.metadata && call.metadata.kind;
   if (kind !== 'screen' && kind !== 'mic') { try { call.close(); } catch {} return; }
-  call.answer();
+  // na resposta, quem assiste pede o som da tela em estéreo e com mais bitrate
+  if (kind === 'screen') call.answer(undefined, { sdpTransform: hifiAudio }); else call.answer();
   call.on('stream', stream => {
     if (S.members.get(m.id) !== m) return;
     if (kind === 'screen') { m.screen = stream; m.screenCall = call; m.presenting = true; m.screenAt = Date.now(); }
@@ -627,6 +666,55 @@ function attachAudio(m, stream) {
   m.audioEl.srcObject = stream;
   m.audioEl.play().catch(() => { $('unmute').hidden = false; });
 }
+// Opus em estéreo a 128 kbps (vale para o som do PC compartilhado junto com a tela)
+function hifiAudio(sdp) {
+  const m = sdp.match(/a=rtpmap:(\d+) opus\/48000/i);
+  if (!m) return sdp;
+  return sdp.replace(new RegExp(`a=fmtp:${m[1]} ([^\\r\\n]*)`), (line, params) => {
+    const extra = ['stereo=1', 'sprop-stereo=1', `maxaveragebitrate=${SCREEN_AUDIO_BITRATE}`]
+      .filter(p => !params.includes(p.split('=')[0] + '='));
+    return extra.length ? `${line};${extra.join(';')}` : line;
+  });
+}
+// Libera mais bitrate para o vídeo da tela e diz ao codificador o que preservar quando a rede apertar
+async function tuneSender(sender) {
+  const q = QUALITY[S.quality];
+  if (!sender.track) return;
+  let p;
+  try { p = sender.getParameters(); } catch { return; }
+  if (!p.encodings || !p.encodings.length) return; // ainda negociando; tenta de novo ao conectar
+  if (sender.track.kind === 'video') {
+    Object.assign(p.encodings[0], { maxBitrate: q.maxBitrate, maxFramerate: q.maxFramerate, scaleResolutionDownBy: 1 });
+    try { await sender.setParameters({ ...p, degradationPreference: q.degradation }); return; } catch {}
+  } else {
+    p.encodings[0].maxBitrate = SCREEN_AUDIO_BITRATE;
+  }
+  try { await sender.setParameters(p); } catch (e) { console.warn('qualidade:', e); }
+}
+function tuneCall(call) {
+  const pc = call.peerConnection;
+  if (!pc) return;
+  const apply = () => pc.getSenders().forEach(tuneSender);
+  apply();
+  pc.addEventListener('connectionstatechange', () => { if (pc.connectionState === 'connected') apply(); });
+}
+function retuneAll() {
+  for (const [key, call] of S.outCalls) if (key.startsWith('screen:')) tuneCall(call);
+}
+async function setQuality(name) {
+  if (!QUALITY[name]) return;
+  S.quality = name;
+  store('tc.qualidade', name);
+  const q = QUALITY[name];
+  const vt = S.screen && S.screen.getVideoTracks()[0];
+  if (vt) {
+    vt.contentHint = q.hint;
+    try { await vt.applyConstraints(q.video); } catch {}
+    retuneAll();
+  }
+  toast(`Qualidade: ${q.title}`);
+  render();
+}
 function dropAudio(m) {
   if (m.audioEl) { m.audioEl.srcObject = null; m.audioEl.remove(); m.audioEl = null; }
   m.micCall = null;
@@ -638,7 +726,11 @@ async function startPresenting() {
   }
   let stream;
   try {
-    stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30, max: 30 } }, audio: true });
+    stream = await navigator.mediaDevices.getDisplayMedia({
+      video: QUALITY[S.quality].video,
+      // som do PC sem os filtros de voz, que estragam música e jogo
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+    });
   } catch (e) {
     if (e.name !== 'NotAllowedError' && e.name !== 'AbortError') toast('Não foi possível capturar a tela: ' + e.message, 6000);
     return;
@@ -647,7 +739,10 @@ async function startPresenting() {
   if (S.screen) S.screen.getTracks().forEach(t => t.stop());
   S.screen = stream;
   const vt = stream.getVideoTracks()[0];
-  if (vt) vt.addEventListener('ended', () => { if (S.screen === stream) stopPresenting(); });
+  if (vt) {
+    vt.contentHint = QUALITY[S.quality].hint;
+    vt.addEventListener('ended', () => { if (S.screen === stream) stopPresenting(); });
+  }
   broadcast({ t: 'present' });
   broadcastState();
   verified().forEach(m => callMember(m, 'screen'));
@@ -680,6 +775,19 @@ async function toggleMic() {
   render();
 }
 $('btn-share').addEventListener('click', () => S.screen ? stopPresenting() : startPresenting());
+for (const b of document.querySelectorAll('.qopt')) {
+  b.querySelector('span').textContent = QUALITY[b.dataset.q].desc;
+  b.addEventListener('click', () => { closeQualityMenu(); if (b.dataset.q !== S.quality) setQuality(b.dataset.q); });
+}
+function closeQualityMenu() { $('qmenu').hidden = true; $('btn-quality').ariaExpanded = 'false'; }
+$('btn-quality').addEventListener('click', e => {
+  e.stopPropagation();
+  const open = $('qmenu').hidden;
+  $('qmenu').hidden = !open; $('btn-quality').ariaExpanded = String(open);
+});
+document.addEventListener('click', e => { if (!$('qmenu').hidden && !e.target.closest('.qwrap')) closeQualityMenu(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeQualityMenu(); });
+$('video').addEventListener('resize', () => { S.stageKey && renderLabel(); });
 $('btn-mic').addEventListener('click', toggleMic);
 $('unmute').addEventListener('click', () => {
   const v = $('video'); v.muted = !!S.screen; v.play().catch(() => {});
@@ -771,7 +879,8 @@ function render() {
   v.hidden = !owner;
   $('stage-empty').hidden = !!owner;
   $('stage-label').hidden = !owner;
-  if (owner) $('stage-label').textContent = owner.label;
+  S.stageLabel = owner ? owner.label : '';
+  renderLabel();
   $('stage-fs').hidden = !owner;
   const presenterWaiting = !owner && others.find(m => m.presenting);
   $('stage-hint').textContent = presenterWaiting
@@ -797,6 +906,8 @@ function render() {
   share.innerHTML = icon(S.screen ? 'stop' : 'screen') + `<span class="lbl">${S.screen ? 'Parar de apresentar' : 'Apresentar'}</span>`;
   share.title = share.ariaLabel = S.screen ? 'Parar de apresentar' : 'Apresentar a tela';
   share.disabled = !canShare();
+  $('btn-quality').parentElement.hidden = !canShare();
+  for (const b of document.querySelectorAll('.qopt')) b.ariaChecked = String(b.dataset.q === S.quality);
   $('count').textContent = total;
   $('tab-count').textContent = total;
   $('btn-people').classList.toggle('active', S.panelOpen && S.tab === 'people');
@@ -819,6 +930,11 @@ function render() {
   if (S.isHost && S.active && S.peer && S.peer.open && !$('status').classList.contains('warn'))
     setStatus(others.length ? '' : 'Sala aberta. Ninguém mais por enquanto.');
 }
+// rótulo do palco com a resolução que está chegando de verdade (ajuda a ver se a rede está segurando a qualidade)
+function renderLabel() {
+  const v = $('video'), el = $('stage-label');
+  el.textContent = S.stageLabel + (S.stageLabel && v.videoWidth ? ` · ${v.videoWidth}×${v.videoHeight}` : '');
+}
 function canShare() { return !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia); }
 function personRow(p) {
   const li = document.createElement('li'); li.className = 'person';
@@ -836,6 +952,7 @@ function personRow(p) {
   return li;
 }
 
+if (QUALITY[load('tc.qualidade')]) S.quality = load('tc.qualidade');
 setupLobby();
 </script>
 </body>

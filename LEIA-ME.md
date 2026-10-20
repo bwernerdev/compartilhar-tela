@@ -14,6 +14,19 @@ Não precisa de conta nem de instalar nada.
 5. Opcional: o botão do **microfone** liga a sua voz para todos, e o **chat** fica no painel lateral.
 6. **Sair** (botão vermelho) encerra a sua participação.
 
+### Qualidade da imagem
+
+O botão **HD**, ao lado de Apresentar, escolhe a qualidade de quando você apresenta.
+Dá para trocar no meio da apresentação:
+
+- **Nitidez** (padrão): para texto, código e planilhas. Captura até 1440p a 30 quadros/s, com até 6 Mbps.
+  Se a rede apertar, perde quadros, mas mantém a resolução.
+- **Fluidez**: para jogos e vídeos. 1080p a até 60 quadros/s, com até 8 Mbps.
+  Se a rede apertar, perde resolução, mas mantém o movimento.
+
+O som do PC vai em estéreo a 128 kbps, sem os filtros de voz. Quem assiste vê no canto do vídeo a resolução
+que está chegando (ex.: `1920×1080`). Se esse número cair, a internet de alguém está segurando a qualidade.
+
 Qualquer pessoa da sala pode apresentar. Quando alguém começa, quem estava apresentando para.
 
 ## Requisitos
