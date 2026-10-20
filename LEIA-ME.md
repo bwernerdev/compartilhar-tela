@@ -12,6 +12,9 @@ Não precisa de conta nem de instalar nada.
 4. Quem abre o link digita o nome, clica em **Entrar** e vê a tela ao vivo.
    Para pôr em **tela cheia**, use o botão no canto do vídeo, o botão da barra ou dê dois cliques no vídeo.
 5. Opcional: o botão do **microfone** liga a sua voz para todos, e o **chat** fica no painel lateral.
+   No chat dá para mandar **imagens**: pelo botão de imagem, colando com **Ctrl+V** (ex.: um print) ou
+   arrastando o arquivo para o chat. A imagem é reduzida para no máximo 1920 px antes de ir, e um clique
+   nela amplia e permite salvar. GIFs animados chegam parados.
 6. Opcional: o botão da **câmera** liga a sua webcam. Com alguém apresentando, as câmeras aparecem numa
    faixa embaixo da tela. Sem apresentação, elas ocupam o centro em grade. Desligar a câmera desliga
    a webcam de verdade, e a luz dela apaga.

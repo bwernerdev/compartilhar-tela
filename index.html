@@ -112,6 +112,12 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
 .msg .meta b{color:var(--text);font-weight:600;margin-right:6px}
 .msg .txt{white-space:pre-wrap;overflow-wrap:anywhere}
 .msg.sys{font-size:12px;color:var(--muted);text-align:center}
+.msg .pic{display:block;margin-top:4px;max-width:100%;max-height:240px;border-radius:8px;cursor:zoom-in;background:var(--surface-2)}
+.chat.drop{outline:2px dashed var(--accent);outline-offset:-6px}
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.88);display:grid;place-items:center;z-index:30;padding:24px}
+.lightbox img{max-width:min(92vw,100%);max-height:calc(100vh - 110px);border-radius:8px;cursor:zoom-out}
+.lightbox .lb-bar{position:fixed;top:12px;right:12px;display:flex;gap:8px}
+.lightbox .lb-bar a,.lightbox .lb-bar button{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;background:var(--surface-3);color:var(--text);text-decoration:none;font-size:14px;font-weight:600}
 .chat-empty{color:var(--muted);font-size:13px;text-align:center;margin:auto 0;padding:24px}
 .chat form{display:flex;gap:6px;padding:10px;border-top:1px solid var(--border)}
 .chat input{flex:1;min-width:0;padding:10px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface-2);outline:none}
@@ -184,7 +190,9 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
   <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12 20 4l-6 16-3-7z"/></symbol>
   <symbol id="i-cam" viewBox="0 0 24 24"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10.5 22 7v10l-6-3.5"/></symbol>
   <symbol id="i-cam-off" viewBox="0 0 24 24"><path d="M10 6h4a2 2 0 0 1 2 2v2.5L22 7v10l-3-1.7M16 16v0a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h1M2 2l20 20"/></symbol>
-  <symbol id="i-hd"viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9v6M10 9v6M6 12h4M14 9v6h1.5a3 3 0 0 0 0-6z"/></symbol>
+  <symbol id="i-img" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></symbol>
+  <symbol id="i-hd" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9v6M10 9v6M6 12h4M14 9v6h1.5a3 3 0 0 0 0-6z"/></symbol>
   <symbol id="i-vol"viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></symbol>
 </svg>
 
@@ -276,7 +284,9 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
       <div class="chat" id="pane-chat" hidden>
         <div class="msgs" id="msgs" aria-live="polite"><div class="chat-empty" id="chat-empty">As mensagens só são vistas por quem está na sala agora e somem quando todos saem.</div></div>
         <form id="chat-form" autocomplete="off">
-          <input id="chat-input" maxlength="1000" placeholder="Enviar mensagem" aria-label="Mensagem">
+          <button class="icon-btn" id="chat-img" type="button" aria-label="Enviar imagem" title="Enviar imagem (ou cole com Ctrl+V)"><svg><use href="#i-img"/></svg></button>
+          <input id="chat-file" type="file" accept="image/*" hidden>
+          <input id="chat-input" maxlength="1000" placeholder="Mensagem ou imagem" aria-label="Mensagem">
           <button class="icon-btn" type="submit" aria-label="Enviar"><svg><use href="#i-send"/></svg></button>
         </form>
       </div>
@@ -642,6 +652,9 @@ function onData(m, d, timer) {
     case 'chat':
       if (typeof d.text === 'string' && d.text.trim()) addChat(m.name, d.text.slice(0, 1000), m.id);
       break;
+    case 'img':
+      onImagePart(m, d);
+      break;
     case 'bye':
       m.left = true;
       try { m.conn.close(); } catch {}
@@ -967,17 +980,110 @@ $('chat-form').addEventListener('submit', e => {
   addChat(S.name, text, null);
   $('chat-input').value = '';
 });
-function addChat(name, text, fromId) {
+function addChat(name, text, fromId, img) {
   $('chat-empty').hidden = true;
   const el = document.createElement('div'); el.className = 'msg';
   const meta = document.createElement('div'); meta.className = 'meta';
   const b = document.createElement('b'); b.textContent = fromId ? name : 'Você';
   meta.append(b, new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
-  const t = document.createElement('div'); t.className = 'txt'; t.textContent = text;
-  el.append(meta, t);
+  el.append(meta);
+  if (img) {
+    const pic = document.createElement('img'); pic.className = 'pic'; pic.alt = `Imagem de ${fromId ? name : 'você'}`;
+    pic.src = img;
+    pic.addEventListener('click', () => openLightbox(img));
+    el.append(pic);
+  } else {
+    const t = document.createElement('div'); t.className = 'txt'; t.textContent = text;
+    el.append(t);
+  }
   appendMsg(el);
   if (fromId && !(S.panelOpen && S.tab === 'chat')) { S.unread++; render(); }
 }
+
+// ---------- imagens no chat ----------
+// A imagem é reduzida no navegador (até 1920 px, WebP), vira data URL e vai em pedaços pela conexão direta.
+// IMG_CHUNK fica abaixo do limite de ~16 KB por mensagem do canal JSON do PeerJS
+const IMG_MAX_SIDE = 1920, IMG_MAX_CHARS = 4_000_000, IMG_CHUNK = 15_000;
+const IMG_RE = /^data:image\/(webp|jpeg|png);base64,[A-Za-z0-9+/=]+$/;
+
+async function sendImage(file) {
+  if (!file || !/^image\//.test(file.type)) { toast('Esse arquivo não é uma imagem.'); return; }
+  if (file.size > 40 * 1024 * 1024) { toast('Imagem grande demais (máximo 40 MB).'); return; }
+  let data;
+  try { data = await shrinkImage(file); }
+  catch { toast('Não foi possível abrir essa imagem.'); return; }
+  if (!data || data.length > IMG_MAX_CHARS) { toast('Mesmo reduzida, a imagem ficou grande demais.'); return; }
+  const id = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+  const n = Math.ceil(data.length / IMG_CHUNK);
+  for (let i = 0; i < n; i++) broadcast({ t: 'img', id, i, n, d: data.slice(i * IMG_CHUNK, (i + 1) * IMG_CHUNK) });
+  addChat(S.name, '', null, data);
+}
+async function shrinkImage(file) {
+  const bmp = await createImageBitmap(file);
+  const k = Math.min(1, IMG_MAX_SIDE / Math.max(bmp.width, bmp.height));
+  const w = Math.max(1, Math.round(bmp.width * k)), h = Math.max(1, Math.round(bmp.height * k));
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  cv.getContext('2d').drawImage(bmp, 0, 0, w, h);
+  bmp.close && bmp.close();
+  for (const q of [0.88, 0.75, 0.6, 0.45]) {
+    let url = cv.toDataURL('image/webp', q);
+    if (!url.startsWith('data:image/webp')) url = cv.toDataURL('image/jpeg', q); // navegador sem WebP
+    if (url.length <= IMG_MAX_CHARS * 0.6) return url;
+  }
+  return cv.toDataURL('image/jpeg', 0.4);
+}
+// junta os pedaços que chegam de cada pessoa; descarta o que estiver fora do padrão ou incompleto por muito tempo
+function onImagePart(m, d) {
+  if (typeof d.id !== 'string' || d.id.length > 40 || !Number.isInteger(d.i) || !Number.isInteger(d.n)
+      || d.n < 1 || d.n > Math.ceil(IMG_MAX_CHARS / IMG_CHUNK) || d.i < 0 || d.i >= d.n
+      || typeof d.d !== 'string' || d.d.length > IMG_CHUNK) return;
+  m.imgs = m.imgs || new Map();
+  let p = m.imgs.get(d.id);
+  if (!p) {
+    if (m.imgs.size >= 3) return; // no máximo 3 imagens chegando ao mesmo tempo por pessoa
+    p = { n: d.n, parts: new Array(d.n), got: 0 };
+    p.timer = setTimeout(() => m.imgs.delete(d.id), 60000);
+    m.imgs.set(d.id, p);
+  }
+  if (p.n !== d.n || p.parts[d.i] !== undefined) return;
+  p.parts[d.i] = d.d; p.got++;
+  if (p.got < p.n) return;
+  clearTimeout(p.timer); m.imgs.delete(d.id);
+  const data = p.parts.join('');
+  if (data.length <= IMG_MAX_CHARS && IMG_RE.test(data)) addChat(m.name, '', m.id, data);
+}
+function openLightbox(src) {
+  const box = document.createElement('div'); box.className = 'lightbox'; box.setAttribute('role', 'dialog');
+  const img = document.createElement('img'); img.src = src; img.alt = 'Imagem ampliada';
+  const bar = document.createElement('div'); bar.className = 'lb-bar';
+  const save = document.createElement('a'); save.href = src;
+  save.download = 'imagem-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + (src.startsWith('data:image/png') ? '.png' : src.startsWith('data:image/jpeg') ? '.jpg' : '.webp');
+  save.innerHTML = icon('down') + 'Salvar';
+  const close = document.createElement('button'); close.type = 'button'; close.innerHTML = icon('x') + 'Fechar';
+  bar.append(save, close);
+  box.append(img, bar);
+  const done = () => { box.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = e => { if (e.key === 'Escape') done(); };
+  box.addEventListener('click', e => { if (e.target === box || e.target === img) done(); });
+  close.addEventListener('click', done);
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(box);
+}
+$('chat-img').addEventListener('click', () => $('chat-file').click());
+$('chat-file').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) sendImage(f); });
+$('chat-input').addEventListener('paste', e => {
+  const f = [...(e.clipboardData && e.clipboardData.files || [])].find(x => /^image\//.test(x.type));
+  if (f) { e.preventDefault(); sendImage(f); }
+});
+// arrastar imagem para o chat
+const chatPane = $('pane-chat');
+chatPane.addEventListener('dragover', e => { if ([...e.dataTransfer.types].includes('Files')) { e.preventDefault(); chatPane.classList.add('drop'); } });
+chatPane.addEventListener('dragleave', e => { if (!chatPane.contains(e.relatedTarget)) chatPane.classList.remove('drop'); });
+chatPane.addEventListener('drop', e => {
+  chatPane.classList.remove('drop');
+  const f = [...e.dataTransfer.files].find(x => /^image\//.test(x.type));
+  if (f) { e.preventDefault(); sendImage(f); }
+});
 function addSystem(text) {
   const el = document.createElement('div'); el.className = 'msg sys'; el.textContent = text;
   appendMsg(el);
@@ -986,7 +1092,12 @@ function appendMsg(el) {
   const box = $('msgs');
   const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
   box.appendChild(el);
-  if (atBottom) box.scrollTop = box.scrollHeight;
+  if (atBottom) {
+    box.scrollTop = box.scrollHeight;
+    // a imagem muda de altura quando termina de carregar
+    const pic = el.querySelector('img');
+    if (pic) pic.addEventListener('load', () => { box.scrollTop = box.scrollHeight; }, { once: true });
+  }
 }
 
 // ---------- desenho ----------
