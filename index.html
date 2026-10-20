@@ -1,0 +1,842 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="dark">
+<title>Tela Compartilhada</title>
+<style>
+:root{
+  --bg:#0f1115; --surface:#1b1e24; --surface-2:#262a32; --surface-3:#30353f;
+  --border:#2f333b; --text:#e8eaed; --muted:#9aa0a6;
+  --accent:#8ab4f8; --accent-ink:#0b1b33; --danger:#ea4335; --danger-ink:#fff;
+  --ok:#34a853; --warn:#fbbc04;
+  --radius:14px; --gutter:16px;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+[hidden]{display:none!important}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* ---------- telas simples (início / saiu / erro) ---------- */
+.screen{min-height:100%;display:grid;place-items:center;padding:32px var(--gutter)}
+.card{width:100%;max-width:440px}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:28px;color:var(--muted);font-weight:600;letter-spacing:.02em}
+.brand-dot{width:28px;height:28px;border-radius:8px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center}
+.brand-dot svg{width:16px;height:16px}
+h1{font-size:28px;line-height:1.2;margin:0 0 8px;font-weight:600;text-wrap:balance}
+.lead{color:var(--muted);margin:0 0 24px}
+label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
+.field{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface);outline:none}
+.field:focus{border-color:var(--accent)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 20px;border-radius:999px;font-weight:600;transition:filter .15s,background .15s}
+.btn-primary{background:var(--accent);color:var(--accent-ink)}
+.btn-primary:hover{filter:brightness(1.08)}
+.btn-ghost{color:var(--accent)}
+.btn-ghost:hover{background:var(--surface-2)}
+.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.help{margin-top:32px;border-top:1px solid var(--border);padding-top:16px;color:var(--muted);font-size:14px}
+.help summary{cursor:pointer;color:var(--text);font-weight:600}
+.help ol,.help ul{padding-left:20px;margin:10px 0}
+.help li{margin:4px 0}
+.help p{margin:8px 0}
+
+/* ---------- sala ---------- */
+#room{height:100vh;height:100dvh;display:grid;grid-template-rows:auto 1fr auto}
+.topbar{display:flex;align-items:center;gap:12px;padding:10px var(--gutter);min-height:56px}
+.topbar .title{font-weight:600;white-space:nowrap}
+.status{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.status.warn{color:var(--warn)}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;background:var(--surface-2);font-size:13px;font-weight:600;white-space:nowrap}
+.chip:hover{background:var(--surface-3)}
+.chip svg{width:16px;height:16px}
+
+.main{display:grid;grid-template-columns:1fr 340px;gap:12px;padding:0 var(--gutter);min-height:0}
+.main.no-panel{grid-template-columns:1fr}
+.stage{position:relative;background:#000;border-radius:var(--radius);overflow:hidden;min-height:0;display:grid;place-items:center}
+.stage video{width:100%;height:100%;object-fit:contain;background:#000;display:block}
+.stage:fullscreen{border-radius:0}
+.stage-empty{text-align:center;padding:24px;color:var(--muted);max-width:420px}
+.stage-empty .big{width:56px;height:56px;margin:0 auto 12px;border-radius:50%;background:var(--surface-2);display:grid;place-items:center;color:var(--text)}
+.stage-empty .big svg{width:26px;height:26px}
+.stage-empty h2{color:var(--text);font-size:18px;margin:0 0 6px;font-weight:600}
+.stage-label{position:absolute;left:12px;bottom:12px;background:rgba(0,0,0,.6);padding:6px 10px;border-radius:8px;font-size:13px;max-width:calc(100% - 80px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stage-fs{position:absolute;right:10px;bottom:10px;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.6);display:grid;place-items:center;color:#fff}
+.stage-fs:hover{background:rgba(0,0,0,.8)}
+.self-note{position:absolute;inset:auto 12px 12px auto}
+.unmute{position:absolute;top:12px;left:50%;transform:translateX(-50%)}
+.invite{position:absolute;top:12px;left:12px;right:12px;max-width:380px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:0 8px 30px rgba(0,0,0,.4);z-index:2}
+.invite h3{margin:0 0 4px;font-size:16px}
+.invite p{margin:0 0 12px;color:var(--muted);font-size:13px}
+.linkbox{display:flex;gap:6px;align-items:center;background:var(--surface-2);border-radius:10px;padding:6px 6px 6px 12px}
+.linkbox input{flex:1;min-width:0;background:none;border:0;outline:none;font-size:13px;color:var(--text)}
+.icon-btn{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:var(--muted)}
+.icon-btn:hover{background:var(--surface-3);color:var(--text)}
+.invite .x{position:absolute;top:8px;right:8px}
+
+.panel{background:var(--surface);border-radius:var(--radius);display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--border)}
+.tab{flex:1;padding:14px 8px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;display:flex;align-items:center;justify-content:center;gap:6px}
+.tab[aria-selected=true]{color:var(--accent);border-bottom-color:var(--accent)}
+.panel-close{display:none}
+.pane{flex:1;overflow:auto;min-height:0}
+.people{list-style:none;margin:0;padding:8px}
+.person{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px}
+.avatar{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:14px;color:#111;flex:none}
+.person .who{flex:1;min-width:0}
+.person .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.person .sub{font-size:12px;color:var(--muted)}
+.person .ic{color:var(--muted);display:flex;gap:6px}
+.person .ic .on{color:var(--accent)}
+.chat{display:flex;flex-direction:column;flex:1;min-height:0}
+.msgs{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.msg .meta{font-size:12px;color:var(--muted)}
+.msg .meta b{color:var(--text);font-weight:600;margin-right:6px}
+.msg .txt{white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.sys{font-size:12px;color:var(--muted);text-align:center}
+.chat-empty{color:var(--muted);font-size:13px;text-align:center;margin:auto 0;padding:24px}
+.chat form{display:flex;gap:6px;padding:10px;border-top:1px solid var(--border)}
+.chat input{flex:1;min-width:0;padding:10px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface-2);outline:none}
+.chat input:focus{border-color:var(--accent)}
+
+.toolbar{display:flex;align-items:center;justify-content:center;gap:10px;padding:12px var(--gutter) max(12px,env(safe-area-inset-bottom));flex-wrap:wrap}
+.tb{position:relative;width:48px;height:48px;border-radius:50%;background:var(--surface-2);display:grid;place-items:center}
+.tb:hover{background:var(--surface-3)}
+.tb.off{background:var(--danger);color:var(--danger-ink)}
+.tb.active{background:var(--accent);color:var(--accent-ink)}
+.tb.wide{width:auto;padding:0 18px;border-radius:999px;display:flex;gap:8px;font-weight:600}
+.tb.leave{background:var(--danger);color:var(--danger-ink);width:64px;border-radius:999px}
+.tb:disabled{opacity:.4;cursor:default}
+.sep{width:1px;height:28px;background:var(--border);margin:0 4px}
+.badge{position:absolute;top:-2px;right:-2px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--accent);color:var(--accent-ink);font-size:11px;font-weight:700;display:grid;place-items:center}
+.count{font-size:12px;font-weight:700;position:absolute;bottom:4px;right:6px}
+
+.toast-wrap{position:fixed;left:50%;top:16px;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:20;width:min(520px,calc(100% - 32px));pointer-events:none}
+.toast{background:var(--surface-3);color:var(--text);padding:10px 14px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.35);font-size:14px;animation:in .2s ease-out}
+@keyframes in{from{opacity:0;transform:translateY(-6px)}}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+@media (max-width:820px){
+  .main{grid-template-columns:1fr;padding:0 8px}
+  .panel{position:fixed;inset:auto 0 0 0;height:min(70dvh,560px);border-radius:var(--radius) var(--radius) 0 0;z-index:10;box-shadow:0 -10px 40px rgba(0,0,0,.5)}
+  .panel-close{display:grid}
+  .topbar .title{display:none}
+  .tb{width:44px;height:44px}
+  .tb.wide .lbl{display:none}
+  .tb.wide{padding:0 13px}
+  .sep{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ícones -->
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-screen" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4M12 13V8M9.5 10.5 12 8l2.5 2.5"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4M9 8l6 6M15 8l-6 6"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></symbol>
+  <symbol id="i-mic-off" viewBox="0 0 24 24"><path d="M15 9.3V5a3 3 0 0 0-5.7-1.3M9 9v2a3 3 0 0 0 4.7 2.5M19 11a7 7 0 0 1-1.2 3.9M5 11a7 7 0 0 0 11 5.7M12 18v4M3 3l18 18"/></symbol>
+  <symbol id="i-full" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="i-unfull" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></symbol>
+  <symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12z"/></symbol>
+  <symbol id="i-leave" viewBox="0 0 24 24"><path d="M3 15c5-5 13-5 18 0l-2.5 2.5-3-2v-3a12 12 0 0 0-7 0v3l-3 2z"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12 20 4l-6 16-3-7z"/></symbol>
+  <symbol id="i-vol" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></symbol>
+</svg>
+
+<!-- ===== início ===== -->
+<main id="lobby" class="screen">
+  <div class="card">
+    <div class="brand"><span class="brand-dot"><svg><use href="#i-screen"/></svg></span>Tela Compartilhada</div>
+    <h1 id="lobby-title">Compartilhe sua tela com um link</h1>
+    <p class="lead" id="lobby-lead">Crie uma sala, mande o link e quem abrir vê sua tela ao vivo. Sem conta, sem instalar nada.</p>
+    <form id="lobby-form" autocomplete="off">
+      <label for="name">Seu nome</label>
+      <input id="name" class="field" maxlength="40" placeholder="Como os outros vão te ver" required>
+      <div class="row">
+        <button class="btn btn-primary" id="lobby-go" type="submit">Criar sala</button>
+        <button class="btn btn-ghost" id="lobby-new" type="button" hidden>Criar uma sala nova</button>
+      </div>
+    </form>
+    <details class="help">
+      <summary>Como usar</summary>
+      <ol>
+        <li>Digite seu nome e clique em <b>Criar sala</b>.</li>
+        <li>Copie o link que aparece e mande para quem vai assistir.</li>
+        <li>Clique em <b>Apresentar</b> e escolha a tela, a janela ou a aba. Marque “Compartilhar áudio” se quiser enviar o som.</li>
+        <li>Quem assiste pode pôr em <b>tela cheia</b> (botão ou duplo clique no vídeo).</li>
+        <li>O microfone e o chat são opcionais. Clique no microfone para falar.</li>
+      </ol>
+      <p><b>Privacidade:</b> só entra quem tem o link. O código da sala fica depois do “#” no endereço, que nunca é enviado a nenhum servidor. A imagem, o som e o chat vão direto de um computador para o outro, criptografados.</p>
+      <p><b>Importante:</b> a sala existe enquanto a aba de quem criou estiver aberta. Se essa aba fechar, quem já está continua conectado, mas ninguém novo entra.</p>
+      <p><b>Não conectou?</b> Algumas redes (empresa, faculdade, 4G/5G) bloqueiam conexão direta entre computadores. Tente outra rede ou o roteador do celular.</p>
+      <p>Compartilhar tela funciona no Chrome, Edge e Firefox de computador. No celular dá para assistir e conversar, mas não apresentar.</p>
+    </details>
+  </div>
+</main>
+
+<!-- ===== saiu / erro ===== -->
+<main id="ended" class="screen" hidden>
+  <div class="card">
+    <div class="brand"><span class="brand-dot"><svg><use href="#i-screen"/></svg></span>Tela Compartilhada</div>
+    <h1 id="ended-title">Você saiu da sala</h1>
+    <p class="lead" id="ended-lead"></p>
+    <div class="row">
+      <button class="btn btn-primary" id="ended-rejoin" type="button">Entrar de novo</button>
+      <button class="btn btn-ghost" id="ended-new" type="button">Criar uma sala nova</button>
+    </div>
+  </div>
+</main>
+
+<!-- ===== sala ===== -->
+<div id="room" hidden>
+  <header class="topbar">
+    <span class="title">Tela Compartilhada</span>
+    <span class="status" id="status" role="status" aria-live="polite"></span>
+    <button class="chip" id="copy-top" type="button"><svg><use href="#i-link"/></svg>Copiar link</button>
+  </header>
+
+  <div class="main" id="main">
+    <section class="stage" id="stage" aria-label="Tela compartilhada">
+      <video id="video" playsinline autoplay hidden></video>
+      <div class="stage-empty" id="stage-empty">
+        <div class="big"><svg><use href="#i-screen"/></svg></div>
+        <h2>Ninguém está apresentando</h2>
+        <div id="stage-hint">Clique em <b>Apresentar</b> para mostrar sua tela.</div>
+      </div>
+      <div class="stage-label" id="stage-label" hidden></div>
+      <button class="stage-fs" id="stage-fs" type="button" hidden aria-label="Tela cheia" title="Tela cheia"><svg><use href="#i-full"/></svg></button>
+      <button class="btn btn-primary unmute" id="unmute" type="button" hidden><svg><use href="#i-vol"/></svg>Ativar som</button>
+      <div class="invite" id="invite" hidden>
+        <button class="icon-btn x" id="invite-close" type="button" aria-label="Fechar"><svg><use href="#i-x"/></svg></button>
+        <h3>Sua sala está pronta</h3>
+        <p>Mande este link para quem vai assistir. Só entra quem tiver o link.</p>
+        <div class="linkbox">
+          <input id="invite-link" readonly aria-label="Link da sala">
+          <button class="icon-btn" id="invite-copy" type="button" aria-label="Copiar link" title="Copiar link"><svg><use href="#i-copy"/></svg></button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel" id="panel" aria-label="Painel lateral">
+      <div class="tabs" role="tablist">
+        <button class="tab" id="tab-people" role="tab" aria-selected="true" type="button">Pessoas (<span id="tab-count">1</span>)</button>
+        <button class="tab" id="tab-chat" role="tab" aria-selected="false" type="button">Chat</button>
+        <button class="icon-btn panel-close" id="panel-close" type="button" aria-label="Fechar painel"><svg><use href="#i-x"/></svg></button>
+      </div>
+      <div class="pane" id="pane-people"><ul class="people" id="people"></ul></div>
+      <div class="chat" id="pane-chat" hidden>
+        <div class="msgs" id="msgs" aria-live="polite"><div class="chat-empty" id="chat-empty">As mensagens só são vistas por quem está na sala agora e somem quando todos saem.</div></div>
+        <form id="chat-form" autocomplete="off">
+          <input id="chat-input" maxlength="1000" placeholder="Enviar mensagem" aria-label="Mensagem">
+          <button class="icon-btn" type="submit" aria-label="Enviar"><svg><use href="#i-send"/></svg></button>
+        </form>
+      </div>
+    </aside>
+  </div>
+
+  <nav class="toolbar" aria-label="Controles">
+    <button class="tb off" id="btn-mic" type="button" aria-label="Ligar microfone" title="Ligar microfone"><svg><use href="#i-mic-off"/></svg></button>
+    <button class="tb wide" id="btn-share" type="button"><svg><use href="#i-screen"/></svg><span class="lbl">Apresentar</span></button>
+    <button class="tb" id="btn-full" type="button" aria-label="Tela cheia" title="Tela cheia"><svg><use href="#i-full"/></svg></button>
+    <span class="sep"></span>
+    <button class="tb" id="btn-people" type="button" aria-label="Pessoas" title="Pessoas"><svg><use href="#i-people"/></svg><span class="count" id="count">1</span></button>
+    <button class="tb" id="btn-chat" type="button" aria-label="Chat" title="Chat"><svg><use href="#i-chat"/></svg><span class="badge" id="badge" hidden>0</span></button>
+    <button class="tb leave" id="btn-leave" type="button" aria-label="Sair da sala" title="Sair da sala"><svg><use href="#i-leave"/></svg></button>
+  </nav>
+</div>
+
+<div id="audios" hidden></div>
+<div class="toast-wrap" id="toasts"></div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js" integrity="sha384-nlUQ8ZqCbvStErob+biJNzSgltf6urV3VGqhfIfzhmg9RXmpeRm76ELw0pYnKlTR" crossorigin="anonymous"></script>
+<script>
+'use strict';
+/*
+  Como funciona
+  - Sinalização: o servidor público e gratuito do PeerJS (0.peerjs.com) só repassa as
+    ofertas/respostas WebRTC. Ele nunca vê o código da sala, só um hash dele.
+  - Mídia e chat: WebRTC ponto a ponto (malha completa, cada pessoa liga para cada pessoa),
+    criptografado (DTLS/SRTP).
+  - Acesso: o código da sala vai no "#" do link. Toda conexão precisa provar que sabe
+    o código antes de receber qualquer dado da sala.
+*/
+const ICE = [
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+  { urls: 'stun:stun.cloudflare.com:3478' },
+];
+const PEER_OPTS = { config: { iceServers: ICE }, debug: 1 };
+const CODE_ALPHABET = 'abcdefghijkmnpqrstuvwxyz23456789'; // 32 símbolos, sem 0/1/l/o
+const CODE_RE = /^[a-z0-9]{24}$/;
+const COLORS = ['#8ab4f8', '#f28b82', '#fdd663', '#81c995', '#c58af9', '#78d9ec', '#fcad70', '#ff8bcb'];
+
+const $ = id => document.getElementById(id);
+const S = {
+  name: '', code: '', hostId: '', isHost: false, peer: null,
+  members: new Map(),      // peerId -> membro
+  pendingCalls: new Map(), // peerId -> [MediaConnection] chegou antes da verificação
+  outCalls: new Map(),     // `${tipo}:${peerId}` -> MediaConnection
+  screen: null, mic: null, micOn: false,
+  hostReached: false, active: false, hostRetries: 0,
+  tab: 'people', panelOpen: true, unread: 0, inviteDismissed: false,
+  stageKey: null, joinTimer: null,
+};
+
+// ---------- utilidades ----------
+function store(key, val) { try { val === undefined ? localStorage.removeItem(key) : localStorage.setItem(key, val); } catch {} }
+function load(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function sstore(key, val) { try { val === undefined ? sessionStorage.removeItem(key) : sessionStorage.setItem(key, val); } catch {} }
+function sload(key) { try { return sessionStorage.getItem(key); } catch { return null; } }
+
+function newCode() {
+  const b = crypto.getRandomValues(new Uint8Array(24)); // 24 × 5 bits = 120 bits
+  return Array.from(b, x => CODE_ALPHABET[x & 31]).join('');
+}
+async function hostIdFor(code) {
+  const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('tela-compartilhada:' + code));
+  return 'tc-' + Array.from(new Uint8Array(h).slice(0, 16), b => b.toString(16).padStart(2, '0')).join('');
+}
+function cleanName(s) { return String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩]/g, '').trim().slice(0, 40) || 'Convidado'; }
+function roomLink() { return location.origin + location.pathname + '#' + S.code; }
+function colorFor(id) { let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0; return COLORS[h % COLORS.length]; }
+function verified() { return [...S.members.values()].filter(m => m.verified); }
+function icon(name) { return `<svg><use href="#i-${name}"/></svg>`; }
+
+function toast(text, ms = 4000) {
+  const el = document.createElement('div');
+  el.className = 'toast'; el.textContent = text;
+  $('toasts').appendChild(el);
+  setTimeout(() => el.remove(), ms);
+}
+function setStatus(text, warn = false) { $('status').textContent = text; $('status').classList.toggle('warn', warn); }
+async function copyLink() {
+  const link = roomLink();
+  try { await navigator.clipboard.writeText(link); toast('Link copiado'); }
+  catch { const i = $('invite-link'); $('invite').hidden = false; i.value = link; i.select(); toast('Selecione e copie o link (Ctrl+C)'); }
+}
+
+// ---------- telas ----------
+function show(which) {
+  for (const id of ['lobby', 'ended', 'room']) $(id).hidden = id !== which;
+}
+function setupLobby() {
+  const code = location.hash.slice(1);
+  $('name').value = load('tc.nome') || '';
+  if (CODE_RE.test(code)) {
+    S.code = code;
+    const mine = sload('tc.host:' + code);
+    $('lobby-title').textContent = mine ? 'Voltar para sua sala' : 'Entrar na sala';
+    $('lobby-lead').textContent = mine
+      ? 'Você criou esta sala nesta aba. Entre de novo para reabri-la.'
+      : 'Você foi convidado para ver uma tela compartilhada. Diga seu nome e entre.';
+    $('lobby-go').textContent = mine ? 'Reabrir sala' : 'Entrar';
+    $('lobby-new').hidden = false;
+  } else {
+    S.code = '';
+    if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  }
+  show('lobby');
+  setTimeout(() => $('name').focus(), 0);
+}
+function ended(title, lead, canRejoin = true) {
+  leaveRoom(false);
+  $('ended-title').textContent = title;
+  $('ended-lead').textContent = lead || '';
+  $('ended-rejoin').hidden = !canRejoin;
+  show('ended');
+}
+function goNewRoom() {
+  history.replaceState(null, '', location.pathname + location.search);
+  S.code = '';
+  setupLobby();
+  $('lobby-title').textContent = 'Compartilhe sua tela com um link';
+  $('lobby-lead').textContent = 'Crie uma sala, mande o link e quem abrir vê sua tela ao vivo. Sem conta, sem instalar nada.';
+  $('lobby-go').textContent = 'Criar sala';
+  $('lobby-new').hidden = true;
+}
+
+$('lobby-form').addEventListener('submit', e => {
+  e.preventDefault();
+  S.name = cleanName($('name').value);
+  store('tc.nome', S.name);
+  if (!S.code) {
+    S.code = newCode();
+    history.replaceState(null, '', '#' + S.code);
+    sstore('tc.host:' + S.code, '1');
+  }
+  enterRoom(!!sload('tc.host:' + S.code));
+});
+$('lobby-new').addEventListener('click', goNewRoom);
+$('ended-new').addEventListener('click', goNewRoom);
+$('ended-rejoin').addEventListener('click', () => enterRoom(!!sload('tc.host:' + S.code)));
+window.addEventListener('hashchange', () => { if (!S.active) setupLobby(); });
+
+// ---------- entrar / sair ----------
+async function enterRoom(asHost) {
+  if (typeof Peer === 'undefined') { ended('Não foi possível carregar a página', 'A biblioteca de conexão (PeerJS) não carregou. Verifique a internet e recarregue.', false); return; }
+  if (!window.RTCPeerConnection || !crypto.subtle) { ended('Navegador sem suporte', 'Use uma versão recente do Chrome, Edge, Firefox ou Safari, num endereço https.', false); return; }
+  S.isHost = asHost; S.active = true; S.hostReached = asHost; S.hostRetries = 0;
+  S.unread = 0; S.inviteDismissed = !asHost; S.stageKey = null;
+  S.hostId = await hostIdFor(S.code);
+  $('msgs').querySelectorAll('.msg').forEach(n => n.remove());
+  $('chat-empty').hidden = false;
+  S.panelOpen = matchMedia('(min-width: 821px)').matches;
+  show('room');
+  setStatus(asHost ? 'Abrindo a sala…' : 'Entrando na sala…');
+  render();
+  openPeer();
+}
+
+function openPeer() {
+  const peer = S.isHost ? new Peer(S.hostId, PEER_OPTS) : new Peer(PEER_OPTS);
+  S.peer = peer;
+  peer.on('open', () => {
+    if (S.peer !== peer) return;
+    if (S.isHost) {
+      setStatus('Sala aberta. Ninguém mais por enquanto.');
+      render();
+    } else if (!S.hostReached) {
+      connectTo(S.hostId);
+      clearTimeout(S.joinTimer);
+      S.joinTimer = setTimeout(() => {
+        if (S.active && !S.hostReached) setStatus('Ainda tentando conectar… Se demorar, a rede pode estar bloqueando conexões diretas (veja “Como usar”).', true);
+      }, 15000);
+    }
+  });
+  peer.on('connection', conn => setupConn(conn, false));
+  peer.on('call', onCall);
+  peer.on('disconnected', () => {
+    // perdeu só o servidor de sinalização; as conexões diretas continuam
+    if (S.peer === peer && !peer.destroyed) setTimeout(() => { if (S.peer === peer && !peer.destroyed && peer.disconnected) try { peer.reconnect(); } catch {} }, 2000);
+  });
+  peer.on('error', err => onPeerError(peer, err));
+}
+
+function onPeerError(peer, err) {
+  if (S.peer !== peer) return;
+  switch (err.type) {
+    case 'peer-unavailable':
+      if (!S.isHost && !S.hostReached && String(err.message).includes(S.hostId))
+        ended('Sala não encontrada', 'O link pode estar errado, ou a pessoa que criou a sala já fechou a página.');
+      break;
+    case 'unavailable-id':
+      // o endereço da sala ainda está preso (recarregou a página) ou a sala já está aberta em outra aba
+      peer.destroy();
+      if (++S.hostRetries <= 4) {
+        setStatus('Reabrindo a sala…');
+        setTimeout(() => { if (S.active) openPeer(); }, 3000);
+      } else {
+        S.isHost = false; S.hostReached = false;
+        toast('Esta sala já está aberta em outra aba. Entrando como participante.');
+        openPeer();
+      }
+      break;
+    case 'browser-incompatible':
+      ended('Navegador sem suporte', 'Este navegador não tem WebRTC. Use Chrome, Edge, Firefox ou Safari.', false);
+      break;
+    case 'network': case 'server-error': case 'socket-error': case 'socket-closed':
+      setStatus('Sem conexão com o servidor de sinalização. Tentando de novo…', true);
+      break;
+    default:
+      console.warn('PeerJS:', err.type, err);
+  }
+}
+
+function leaveRoom(sayBye = true) {
+  if (!S.active) return;
+  S.active = false;
+  clearTimeout(S.joinTimer); clearInterval(S.hostWatch);
+  if (sayBye) broadcast({ t: 'bye' });
+  if (S.screen) { S.screen.getTracks().forEach(t => t.stop()); S.screen = null; }
+  if (S.mic) { S.mic.getTracks().forEach(t => t.stop()); S.mic = null; S.micOn = false; }
+  for (const m of S.members.values()) { dropAudio(m); m.screen = null; }
+  S.members.clear(); S.outCalls.clear(); S.pendingCalls.clear();
+  const v = $('video'); v.srcObject = null;
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  const p = S.peer; S.peer = null;
+  if (p) setTimeout(() => p.destroy(), sayBye ? 300 : 0); // deixa o "tchau" sair
+}
+$('btn-leave').addEventListener('click', () => {
+  const host = S.isHost;
+  leaveRoom(true);
+  ended('Você saiu da sala', host ? 'Quem ainda está na sala continua conectado, mas ninguém novo entra enquanto você estiver fora.' : '');
+});
+window.addEventListener('pagehide', () => leaveRoom(true));
+window.addEventListener('pageshow', e => { if (e.persisted && !S.active && !$('room').hidden) setupLobby(); });
+
+// ---------- conexões de dados ----------
+function connectTo(id) {
+  if (!S.peer || S.members.has(id)) return;
+  const conn = S.peer.connect(id, { reliable: true, serialization: 'json' });
+  if (conn) setupConn(conn, true);
+}
+
+function hello() {
+  return { t: 'hello', code: S.code, name: S.name, mic: S.micOn, presenting: !!S.screen };
+}
+function send(conn, msg) { try { if (conn.open) conn.send(msg); } catch {} }
+function broadcast(msg) { for (const m of verified()) send(m.conn, msg); }
+function broadcastState() { broadcast({ t: 'state', mic: S.micOn, presenting: !!S.screen }); }
+
+function setupConn(conn, outgoing) {
+  const old = S.members.get(conn.peer);
+  if (old && old.verified && old.conn.open) { conn.close(); return; } // já conectados
+  const m = { id: conn.peer, conn, outgoing, verified: false, name: '', mic: false, presenting: false,
+              isHost: conn.peer === S.hostId, screen: null, screenCall: null, micCall: null, audioEl: null };
+  S.members.set(conn.peer, m);
+  if (old) try { old.conn.close(); } catch {}
+  const timer = setTimeout(() => { if (!m.verified) try { conn.close(); } catch {} }, 20000);
+  // quem liga se apresenta primeiro; quem recebe só responde depois de conferir o código
+  conn.on('open', () => { if (outgoing) send(conn, hello()); });
+  conn.on('data', d => { if (S.members.get(m.id) === m) onData(m, d, timer); });
+  conn.on('close', () => removeMember(m));
+  conn.on('error', () => removeMember(m));
+}
+
+function onData(m, d, timer) {
+  if (!d || typeof d !== 'object') return;
+  if (!m.verified) {
+    if (d.t !== 'hello' || d.code !== S.code) { try { m.conn.close(); } catch {} return; }
+    clearTimeout(timer);
+    m.verified = true;
+    m.name = cleanName(d.name);
+    m.mic = !!d.mic;
+    m.presenting = !!d.presenting;
+    if (!m.outgoing) send(m.conn, hello());
+    if (S.isHost) send(m.conn, { t: 'members', ids: verified().filter(x => x !== m).map(x => x.id) });
+    if (m.isHost && !S.isHost && !S.hostReached) {
+      S.hostReached = true; clearTimeout(S.joinTimer);
+      setStatus(''); toast('Você entrou na sala');
+    }
+    if (!m.outgoing) addSystem(`${m.name} entrou`);
+    if (S.screen) callMember(m, 'screen');
+    if (S.mic) callMember(m, 'mic');
+    const pend = S.pendingCalls.get(m.id);
+    if (pend) { S.pendingCalls.delete(m.id); pend.forEach(c => acceptCall(m, c)); }
+    render();
+    return;
+  }
+  switch (d.t) {
+    case 'members':
+      if (m.isHost && Array.isArray(d.ids))
+        d.ids.slice(0, 50).forEach(id => { if (typeof id === 'string' && id.length < 80 && S.peer && id !== S.peer.id) connectTo(id); });
+      break;
+    case 'state':
+      m.mic = !!d.mic; m.presenting = !!d.presenting;
+      if (!m.presenting) { m.screen = null; m.screenCall = null; }
+      render();
+      break;
+    case 'present':
+      m.presenting = true;
+      if (S.screen) stopPresenting(`${m.name} começou a apresentar`);
+      render();
+      break;
+    case 'chat':
+      if (typeof d.text === 'string' && d.text.trim()) addChat(m.name, d.text.slice(0, 1000), m.id);
+      break;
+    case 'bye':
+      m.left = true;
+      try { m.conn.close(); } catch {}
+      removeMember(m);
+      break;
+  }
+}
+
+function removeMember(m) {
+  if (S.members.get(m.id) !== m) return;
+  S.members.delete(m.id);
+  dropAudio(m);
+  m.screen = null;
+  for (const kind of ['screen', 'mic']) closeOut(kind, m.id);
+  if (m.verified && S.active) {
+    addSystem(`${m.name} saiu`);
+    if (m.isHost && !S.isHost && !m.left) toast('A conexão com quem criou a sala caiu. Tentando reconectar…', 5000);
+    else if (m.isHost && !S.isHost) toast('A pessoa que criou a sala saiu. Quem está aqui continua conectado, mas ninguém novo consegue entrar até ela voltar.', 7000);
+    if (m.isHost && !S.isHost) watchHost();
+  }
+  render();
+}
+// se quem criou a sala sair ou recarregar a página, tenta voltar a falar com ela de tempos em tempos
+function watchHost() {
+  clearInterval(S.hostWatch);
+  S.hostWatch = setInterval(() => {
+    if (!S.active || S.isHost) { clearInterval(S.hostWatch); return; }
+    const h = S.members.get(S.hostId);
+    if (h && h.verified) { clearInterval(S.hostWatch); return; }
+    if (!h && S.peer && S.peer.open) connectTo(S.hostId);
+  }, 10000);
+}
+
+// ---------- mídia ----------
+function callMember(m, kind) {
+  const stream = kind === 'screen' ? S.screen : S.mic;
+  if (!stream || !S.peer) return;
+  closeOut(kind, m.id);
+  const call = S.peer.call(m.id, stream, { metadata: { kind } });
+  if (!call) return;
+  const key = kind + ':' + m.id;
+  S.outCalls.set(key, call);
+  call.on('close', () => { if (S.outCalls.get(key) === call) S.outCalls.delete(key); });
+  call.on('error', () => {});
+}
+function closeOut(kind, id) {
+  const key = kind + ':' + id, c = S.outCalls.get(key);
+  if (c) { S.outCalls.delete(key); try { c.close(); } catch {} }
+}
+function onCall(call) {
+  const m = S.members.get(call.peer);
+  if (m && m.verified) { acceptCall(m, call); return; }
+  // a chamada chegou antes do "oi": espera um pouco a verificação
+  const list = S.pendingCalls.get(call.peer) || [];
+  list.push(call); S.pendingCalls.set(call.peer, list);
+  setTimeout(() => {
+    const l = S.pendingCalls.get(call.peer);
+    if (l && l.includes(call)) { l.splice(l.indexOf(call), 1); try { call.close(); } catch {} }
+  }, 15000);
+}
+function acceptCall(m, call) {
+  const kind = call.metadata && call.metadata.kind;
+  if (kind !== 'screen' && kind !== 'mic') { try { call.close(); } catch {} return; }
+  call.answer();
+  call.on('stream', stream => {
+    if (S.members.get(m.id) !== m) return;
+    if (kind === 'screen') { m.screen = stream; m.screenCall = call; m.presenting = true; m.screenAt = Date.now(); }
+    else { m.micCall = call; attachAudio(m, stream); }
+    render();
+  });
+  call.on('close', () => {
+    if (kind === 'screen' && m.screenCall === call) { m.screen = null; m.screenCall = null; render(); }
+    if (kind === 'mic' && m.micCall === call) dropAudio(m);
+  });
+  call.on('error', () => {});
+}
+function attachAudio(m, stream) {
+  if (!m.audioEl) { m.audioEl = document.createElement('audio'); m.audioEl.autoplay = true; $('audios').appendChild(m.audioEl); }
+  m.audioEl.srcObject = stream;
+  m.audioEl.play().catch(() => { $('unmute').hidden = false; });
+}
+function dropAudio(m) {
+  if (m.audioEl) { m.audioEl.srcObject = null; m.audioEl.remove(); m.audioEl = null; }
+  m.micCall = null;
+}
+
+async function startPresenting() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+    toast('Este navegador não deixa compartilhar a tela. Use Chrome, Edge ou Firefox no computador.', 6000); return;
+  }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30, max: 30 } }, audio: true });
+  } catch (e) {
+    if (e.name !== 'NotAllowedError' && e.name !== 'AbortError') toast('Não foi possível capturar a tela: ' + e.message, 6000);
+    return;
+  }
+  if (!S.active) { stream.getTracks().forEach(t => t.stop()); return; }
+  if (S.screen) S.screen.getTracks().forEach(t => t.stop());
+  S.screen = stream;
+  const vt = stream.getVideoTracks()[0];
+  if (vt) vt.addEventListener('ended', () => { if (S.screen === stream) stopPresenting(); });
+  broadcast({ t: 'present' });
+  broadcastState();
+  verified().forEach(m => callMember(m, 'screen'));
+  render();
+}
+function stopPresenting(reason) {
+  if (!S.screen) return;
+  S.screen.getTracks().forEach(t => t.stop());
+  S.screen = null;
+  for (const key of [...S.outCalls.keys()]) if (key.startsWith('screen:')) closeOut('screen', key.slice(7));
+  broadcastState();
+  if (reason) toast(reason);
+  render();
+}
+async function toggleMic() {
+  if (!S.mic) {
+    try {
+      S.mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    } catch {
+      toast('O microfone não foi liberado. Confira a permissão no cadeado ao lado do endereço.', 6000); return;
+    }
+    if (!S.active) { S.mic.getTracks().forEach(t => t.stop()); S.mic = null; return; }
+    S.micOn = true;
+    verified().forEach(m => callMember(m, 'mic'));
+  } else {
+    S.micOn = !S.micOn;
+    S.mic.getAudioTracks().forEach(t => { t.enabled = S.micOn; });
+  }
+  broadcastState();
+  render();
+}
+$('btn-share').addEventListener('click', () => S.screen ? stopPresenting() : startPresenting());
+$('btn-mic').addEventListener('click', toggleMic);
+$('unmute').addEventListener('click', () => {
+  const v = $('video'); v.muted = !!S.screen; v.play().catch(() => {});
+  for (const m of S.members.values()) if (m.audioEl) m.audioEl.play().catch(() => {});
+  $('unmute').hidden = true;
+});
+
+// ---------- tela cheia ----------
+function toggleFullscreen() {
+  const stage = $('stage'), v = $('video');
+  if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
+  if (stage.requestFullscreen) stage.requestFullscreen().catch(() => toast('Não foi possível entrar em tela cheia.'));
+  else if (v.webkitEnterFullscreen && !v.hidden) v.webkitEnterFullscreen(); // iPhone
+}
+$('btn-full').addEventListener('click', toggleFullscreen);
+$('stage-fs').addEventListener('click', toggleFullscreen);
+$('video').addEventListener('dblclick', toggleFullscreen);
+document.addEventListener('fullscreenchange', render);
+
+// ---------- painel / chat ----------
+function openPanel(tab) {
+  if (S.panelOpen && S.tab === tab) { S.panelOpen = false; render(); return; }
+  S.tab = tab; S.panelOpen = true;
+  if (tab === 'chat') { S.unread = 0; setTimeout(() => $('chat-input').focus(), 0); }
+  render();
+}
+$('btn-people').addEventListener('click', () => openPanel('people'));
+$('btn-chat').addEventListener('click', () => openPanel('chat'));
+$('tab-people').addEventListener('click', () => { S.tab = 'people'; render(); });
+$('tab-chat').addEventListener('click', () => { S.tab = 'chat'; S.unread = 0; render(); });
+$('panel-close').addEventListener('click', () => { S.panelOpen = false; render(); });
+// no celular o painel cobre o vídeo: fecha sozinho quando a tela fica estreita
+matchMedia('(max-width: 820px)').addEventListener('change', e => { if (e.matches && S.panelOpen) { S.panelOpen = false; render(); } });
+$('copy-top').addEventListener('click', copyLink);
+$('invite-copy').addEventListener('click', copyLink);
+$('invite-close').addEventListener('click', () => { S.inviteDismissed = true; render(); });
+
+$('chat-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const text = $('chat-input').value.trim().slice(0, 1000);
+  if (!text) return;
+  broadcast({ t: 'chat', text });
+  addChat(S.name, text, null);
+  $('chat-input').value = '';
+});
+function addChat(name, text, fromId) {
+  $('chat-empty').hidden = true;
+  const el = document.createElement('div'); el.className = 'msg';
+  const meta = document.createElement('div'); meta.className = 'meta';
+  const b = document.createElement('b'); b.textContent = fromId ? name : 'Você';
+  meta.append(b, new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+  const t = document.createElement('div'); t.className = 'txt'; t.textContent = text;
+  el.append(meta, t);
+  appendMsg(el);
+  if (fromId && !(S.panelOpen && S.tab === 'chat')) { S.unread++; render(); }
+}
+function addSystem(text) {
+  const el = document.createElement('div'); el.className = 'msg sys'; el.textContent = text;
+  appendMsg(el);
+}
+function appendMsg(el) {
+  const box = $('msgs');
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  box.appendChild(el);
+  if (atBottom) box.scrollTop = box.scrollHeight;
+}
+
+// ---------- desenho ----------
+function render() {
+  if (!S.active) return;
+  const others = verified();
+  const total = others.length + 1;
+
+  // palco: quem está apresentando
+  let owner = null;
+  if (S.screen) owner = { key: 'me', stream: S.screen, label: 'Você está apresentando. Todos na sala veem esta tela.', mine: true };
+  else {
+    const p = others.filter(m => m.screen).sort((a, b) => (b.screenAt || 0) - (a.screenAt || 0))[0];
+    if (p) owner = { key: p.id + ':' + p.screen.id, stream: p.screen, label: `Tela de ${p.name}`, mine: false };
+  }
+  const v = $('video');
+  if ((owner && owner.key) !== S.stageKey) {
+    S.stageKey = owner ? owner.key : null;
+    v.srcObject = owner ? owner.stream : null;
+    v.muted = owner ? owner.mine : true;
+    $('unmute').hidden = true;
+    if (owner) v.play().catch(() => { v.muted = true; v.play().catch(() => {}); if (!owner.mine) $('unmute').hidden = false; });
+  }
+  v.hidden = !owner;
+  $('stage-empty').hidden = !!owner;
+  $('stage-label').hidden = !owner;
+  if (owner) $('stage-label').textContent = owner.label;
+  $('stage-fs').hidden = !owner;
+  const presenterWaiting = !owner && others.find(m => m.presenting);
+  $('stage-hint').textContent = presenterWaiting
+    ? `${presenterWaiting.name} está apresentando. Carregando a imagem…`
+    : canShare() ? 'Clique em Apresentar para mostrar sua tela.' : 'Quando alguém apresentar, a tela aparece aqui.';
+  const fs = !!document.fullscreenElement;
+  $('stage-fs').innerHTML = icon(fs ? 'unfull' : 'full');
+  $('btn-full').innerHTML = icon(fs ? 'unfull' : 'full');
+  $('btn-full').disabled = !owner;
+
+  // convite (só para quem criou, até fechar ou alguém entrar)
+  const showInvite = S.isHost && !S.inviteDismissed && others.length === 0 && !owner;
+  $('invite').hidden = !showInvite;
+  if (showInvite) $('invite-link').value = roomLink();
+
+  // barra de ferramentas
+  const mic = $('btn-mic');
+  mic.classList.toggle('off', !S.micOn);
+  mic.innerHTML = icon(S.micOn ? 'mic' : 'mic-off');
+  mic.title = mic.ariaLabel = S.micOn ? 'Desligar microfone' : 'Ligar microfone';
+  const share = $('btn-share');
+  share.classList.toggle('active', !!S.screen);
+  share.innerHTML = icon(S.screen ? 'stop' : 'screen') + `<span class="lbl">${S.screen ? 'Parar de apresentar' : 'Apresentar'}</span>`;
+  share.title = share.ariaLabel = S.screen ? 'Parar de apresentar' : 'Apresentar a tela';
+  share.disabled = !canShare();
+  $('count').textContent = total;
+  $('tab-count').textContent = total;
+  $('btn-people').classList.toggle('active', S.panelOpen && S.tab === 'people');
+  $('btn-chat').classList.toggle('active', S.panelOpen && S.tab === 'chat');
+  $('badge').hidden = S.unread === 0;
+  $('badge').textContent = S.unread > 9 ? '9+' : S.unread;
+
+  // painel
+  $('panel').hidden = !S.panelOpen;
+  $('main').classList.toggle('no-panel', !S.panelOpen);
+  $('tab-people').ariaSelected = String(S.tab === 'people');
+  $('tab-chat').ariaSelected = String(S.tab === 'chat');
+  $('pane-people').hidden = S.tab !== 'people';
+  $('pane-chat').hidden = S.tab !== 'chat';
+
+  const list = $('people'); list.textContent = '';
+  const me = { id: S.peer && S.peer.id || 'me', name: S.name, mic: S.micOn, presenting: !!S.screen, isHost: S.isHost, me: true };
+  for (const p of [me, ...others]) list.appendChild(personRow(p));
+
+  if (S.isHost && S.active && S.peer && S.peer.open && !$('status').classList.contains('warn'))
+    setStatus(others.length ? '' : 'Sala aberta. Ninguém mais por enquanto.');
+}
+function canShare() { return !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia); }
+function personRow(p) {
+  const li = document.createElement('li'); li.className = 'person';
+  const av = document.createElement('div'); av.className = 'avatar';
+  av.style.background = colorFor(p.id); av.textContent = p.name.slice(0, 1).toUpperCase();
+  const who = document.createElement('div'); who.className = 'who';
+  const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = p.name + (p.me ? ' (você)' : '');
+  const sub = document.createElement('div'); sub.className = 'sub';
+  sub.textContent = [p.isHost ? 'Criou a sala' : '', p.presenting ? 'Apresentando' : ''].filter(Boolean).join(' · ');
+  who.append(nm); if (sub.textContent) who.append(sub);
+  const ic = document.createElement('div'); ic.className = 'ic';
+  ic.innerHTML = (p.presenting ? `<span class="on" title="Apresentando">${icon('screen')}</span>` : '')
+    + `<span class="${p.mic ? 'on' : ''}" title="${p.mic ? 'Microfone ligado' : 'Microfone desligado'}">${icon(p.mic ? 'mic' : 'mic-off')}</span>`;
+  li.append(av, who, ic);
+  return li;
+}
+
+setupLobby();
+</script>
+</body>
+</html>
