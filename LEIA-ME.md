@@ -24,8 +24,14 @@ Dá para trocar no meio da apresentação:
 
 - **Nitidez** (padrão): para texto, código e planilhas. Captura até 1440p a 30 quadros/s, com até 6 Mbps.
   Se a rede apertar, perde quadros, mas mantém a resolução.
-- **Fluidez**: para jogos e vídeos. 1080p a até 60 quadros/s, com até 8 Mbps.
+- **Fluidez**: para jogos e vídeos. Até 1440p a 60 quadros/s, com até 16 Mbps. Usa H.264, que é codificado
+  pela placa de vídeo (NVIDIA, Intel ou AMD), então não pesa na CPU nem atrapalha o jogo. Já começa
+  com bitrate mais alto, para a imagem não ficar borrada nos primeiros segundos.
   Se a rede apertar, perde resolução, mas mantém o movimento.
+  Trocar para ou de Fluidez no meio da apresentação reconecta a imagem: ela pisca por um instante.
+
+Para 1440p60 chegar inteiro, quem apresenta precisa de uns 15 Mbps de upload por pessoa assistindo.
+Com menos que isso, a resolução baixa sozinha para manter os 60 quadros/s.
 
 O som do PC vai em estéreo a 128 kbps, sem os filtros de voz. Quem assiste vê no canto do vídeo a resolução
 que está chegando (ex.: `1920×1080`). Se esse número cair, a internet de alguém está segurando a qualidade.

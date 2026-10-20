@@ -343,9 +343,11 @@ const QUALITY = {
     video: { width: { ideal: 2560 }, height: { ideal: 1440 }, frameRate: { ideal: 30, max: 30 } },
   },
   fluidez: {
-    title: 'Fluidez', desc: 'Para jogos e vídeos. 1080p, até 60 quadros/s.',
-    hint: 'motion', degradation: 'maintain-framerate', maxBitrate: 8_000_000, maxFramerate: 60,
-    video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 60, max: 60 } },
+    title: 'Fluidez', desc: 'Para jogos e vídeos. Até 1440p a 60 quadros/s.',
+    hint: 'motion', degradation: 'maintain-framerate', maxBitrate: 16_000_000, maxFramerate: 60,
+    // H.264 usa o codificador da placa de vídeo (NVENC/QuickSync/AMF): 1440p60 sem travar a CPU
+    codec: 'H264', startKbps: 4000,
+    video: { width: { ideal: 2560 }, height: { ideal: 1440 }, frameRate: { ideal: 60, max: 60 } },
   },
 };
 const SCREEN_AUDIO_BITRATE = 128_000; // som do PC em estéreo (o padrão do WebRTC é ~32 kbps, mono)
@@ -459,7 +461,7 @@ async function enterRoom(asHost) {
   if (typeof Peer === 'undefined') { ended('Não foi possível carregar a página', 'A biblioteca de conexão (PeerJS) não carregou. Verifique a internet e recarregue.', false); return; }
   if (!window.RTCPeerConnection || !crypto.subtle) { ended('Navegador sem suporte', 'Use uma versão recente do Chrome, Edge, Firefox ou Safari, num endereço https.', false); return; }
   S.isHost = asHost; S.active = true; S.hostReached = asHost; S.hostRetries = 0; S.hostFails = 0;
-  S.unread = 0; S.inviteDismissed = !asHost; S.stageKey = null;
+  S.unread = 0; S.inviteDismissed = !asHost; S.stageKey = null; S.stageStream = null;
   S.hostId = await hostIdFor(S.code);
   $('msgs').querySelectorAll('.msg').forEach(n => n.remove());
   $('chat-empty').hidden = false;
@@ -679,7 +681,12 @@ function callMember(m, kind) {
   if (!stream || !S.peer) return;
   closeOut(kind, m.id);
   const opts = { metadata: { kind } };
-  if (kind === 'screen') opts.sdpTransform = hifiAudio;
+  if (kind === 'screen') {
+    const q = QUALITY[S.quality];
+    opts.metadata.codec = q.codec || null;
+    opts.metadata.startKbps = q.startKbps || null;
+    opts.sdpTransform = sdp => screenSdp(sdp, opts.metadata);
+  }
   const call = S.peer.call(m.id, stream, opts);
   if (!call) return;
   const key = kind + ':' + m.id;
@@ -707,7 +714,8 @@ function acceptCall(m, call) {
   const kind = call.metadata && call.metadata.kind;
   if (kind !== 'screen' && kind !== 'mic' && kind !== 'cam') { try { call.close(); } catch {} return; }
   // na resposta, quem assiste pede o som da tela em estéreo e com mais bitrate
-  if (kind === 'screen') call.answer(undefined, { sdpTransform: hifiAudio }); else call.answer();
+  // e confirma o codec pedido por quem apresenta
+  if (kind === 'screen') call.answer(undefined, { sdpTransform: sdp => screenSdp(sdp, call.metadata) }); else call.answer();
   call.on('stream', stream => {
     if (S.members.get(m.id) !== m) return;
     if (kind === 'screen') { m.screen = stream; m.screenCall = call; m.presenting = true; m.screenAt = Date.now(); }
@@ -737,6 +745,35 @@ function hifiAudio(sdp) {
     return extra.length ? `${line};${extra.join(';')}` : line;
   });
 }
+// Ajustes de SDP da tela: som em estéreo e, no modo Fluidez, H.264 primeiro e bitrate inicial mais alto
+function screenSdp(sdp, meta) {
+  sdp = hifiAudio(sdp);
+  const codec = meta && typeof meta.codec === 'string' && /^[A-Za-z0-9]{2,8}$/.test(meta.codec) ? meta.codec : null;
+  if (!codec) return sdp;
+  const start = meta && Number.isFinite(meta.startKbps) ? Math.min(Math.max(meta.startKbps | 0, 300), 10000) : 0;
+  const lines = sdp.split('\r\n');
+  const mi = lines.findIndex(l => l.startsWith('m=video'));
+  if (mi < 0) return sdp;
+  let end = lines.findIndex((l, i) => i > mi && l.startsWith('m='));
+  if (end < 0) end = lines.length;
+  const fmtp = {}, pts = [];
+  const re = new RegExp(`^a=rtpmap:(\\d+) ${codec}/`, 'i');
+  for (let i = mi + 1; i < end; i++) {
+    const r = lines[i].match(re); if (r) pts.push(r[1]);
+    const f = lines[i].match(/^a=fmtp:(\d+) (.*)$/); if (f) fmtp[f[1]] = f[2];
+  }
+  if (!pts.length) return sdp; // navegador sem esse codec: segue com o padrão
+  // H.264: prefere packetization-mode=1 e perfil High (64…), depois Constrained Baseline (42e0…)
+  const score = pt => { const f = fmtp[pt] || ''; return (/packetization-mode=1/.test(f) ? 4 : 0) + (/profile-level-id=64/i.test(f) ? 2 : /profile-level-id=42e0/i.test(f) ? 1 : 0); };
+  pts.sort((a, b) => score(b) - score(a));
+  const parts = lines[mi].split(' ');
+  lines[mi] = [...parts.slice(0, 3), ...pts, ...parts.slice(3).filter(p => !pts.includes(p))].join(' ');
+  if (start) for (let i = mi + 1; i < end; i++) {
+    const f = lines[i].match(/^a=fmtp:(\d+) (.*)$/);
+    if (f && pts.includes(f[1]) && !/x-google-start-bitrate/.test(f[2])) lines[i] += `;x-google-start-bitrate=${start}`;
+  }
+  return lines.join('\r\n');
+}
 // Libera mais bitrate para o vídeo da tela e diz ao codificador o que preservar quando a rede apertar
 async function tuneSender(sender) {
   const q = QUALITY[S.quality];
@@ -764,6 +801,7 @@ function retuneAll() {
 }
 async function setQuality(name) {
   if (!QUALITY[name]) return;
+  const codecChanged = (QUALITY[S.quality].codec || null) !== (QUALITY[name].codec || null);
   S.quality = name;
   store('tc.qualidade', name);
   const q = QUALITY[name];
@@ -771,7 +809,9 @@ async function setQuality(name) {
   if (vt) {
     vt.contentHint = q.hint;
     try { await vt.applyConstraints(q.video); } catch {}
-    retuneAll();
+    // o codec só muda numa conexão nova: liga de novo para cada um (a imagem pisca um instante)
+    if (codecChanged) verified().forEach(m => callMember(m, 'screen'));
+    else retuneAll();
   }
   toast(`Qualidade: ${q.title}`);
   render();
@@ -963,7 +1003,9 @@ function render() {
     if (p) owner = { key: p.id + ':' + p.screen.id, stream: p.screen, label: `Tela de ${p.name}`, mine: false };
   }
   const v = $('video');
-  if ((owner && owner.key) !== S.stageKey) {
+  // compara o próprio stream: uma nova chamada da mesma pessoa pode vir com o mesmo id
+  if ((owner ? owner.stream : null) !== S.stageStream) {
+    S.stageStream = owner ? owner.stream : null;
     S.stageKey = owner ? owner.key : null;
     v.srcObject = owner ? owner.stream : null;
     v.muted = owner ? owner.mine : true;
