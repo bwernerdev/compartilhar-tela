@@ -54,9 +54,25 @@ Qualquer pessoa da sala pode apresentar. Quando alguém começa, quem estava apr
   mas ninguém novo entra até ela voltar (reabrindo o mesmo link na mesma aba).
 - Sem servidor TURN (retransmissão), algumas redes bloqueiam a conexão direta: empresa, faculdade,
   4G/5G e provedores com CGNAT. Nesses casos, quem entra vê “A rede de vocês bloqueou a conexão direta”,
-  e a página tenta de novo sozinha a cada ~25 s. Para funcionar em qualquer rede, preencha a lista `TURN`
-  no começo do script com as credenciais de um provedor de TURN. O ExpressTURN, por exemplo, tem plano
-  grátis de 1000 GB/mês e servidor em São Paulo. Essas credenciais ficam visíveis no código da página.
+  e a página tenta de novo sozinha a cada ~25 s. Para funcionar em qualquer rede, use o TURN da Cloudflare
+  (veja abaixo).
+
+## TURN da Cloudflare (para funcionar em qualquer rede)
+
+A pasta `cloudflare-turn/` tem um Worker que entrega à página credenciais TURN que expiram em 24 h.
+A chave de verdade fica guardada como segredo na Cloudflare e nunca aparece no site.
+O plano grátis cobre 1000 GB por mês, e o TURN só é usado quando a conexão direta falha.
+
+1. Crie uma conta em [dash.cloudflare.com](https://dash.cloudflare.com).
+2. No painel, abra **Realtime > TURN Server > Create**. Anote o **Turn Token ID** e o **API Token**.
+3. Rode o script e siga as instruções. Ele faz o login, publica o Worker e pede os dois valores:
+
+   ```bash
+   powershell -ExecutionPolicy Bypass -File cloudflare-turn/configurar.ps1
+   ```
+
+4. Coloque o endereço `https://tela-compartilhada-turn.<sua-conta>.workers.dev` em `TURN_ENDPOINT`,
+   no começo do script do `index.html`, e publique.
 - O aviso do Chrome “… está compartilhando sua tela” não pode ser escondido pela página. É uma proteção do
   navegador. Clique em **Ocultar** para tirá-lo da frente.
 

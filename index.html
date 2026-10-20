@@ -294,15 +294,13 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
   - Acesso: o código da sala vai no "#" do link. Toda conexão precisa provar que sabe
     o código antes de receber qualquer dado da sala.
 */
-// Servidor de retransmissão (TURN). Sem ele, redes que bloqueiam conexão direta (CGNAT, empresa, 4G)
-// ficam em "tentando conectar". Preencha com as credenciais do seu provedor de TURN.
-const TURN = [
-  // { urls: ['turn:HOST:3478?transport=udp', 'turn:HOST:3478?transport=tcp'], username: 'USUARIO', credential: 'SENHA' },
-];
+// Servidor de retransmissão (TURN) da Cloudflare. Sem ele, redes que bloqueiam conexão direta
+// (CGNAT, empresa, 4G) ficam em "tentando conectar". O Worker em cloudflare-turn/ entrega
+// credenciais temporárias; vazio = só conexão direta.
+const TURN_ENDPOINT = '';
 const ICE = [
   { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
   { urls: 'stun:stun.cloudflare.com:3478' },
-  ...TURN,
 ];
 const PEER_OPTS = { config: { iceServers: ICE }, debug: 1 };
 // Qualidade da transmissão. "Nitidez" guarda a resolução (texto legível); "Fluidez" guarda os quadros por segundo.
@@ -437,7 +435,26 @@ async function enterRoom(asHost) {
   show('room');
   setStatus(asHost ? 'Abrindo a sala…' : 'Entrando na sala…');
   render();
-  openPeer();
+  await loadTurn();
+  if (S.active) openPeer();
+}
+
+// Busca credenciais TURN temporárias. Se falhar, segue só com conexão direta.
+async function loadTurn() {
+  S.hasTurn = false;
+  PEER_OPTS.config.iceServers = ICE;
+  if (!TURN_ENDPOINT) return;
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 5000);
+    const r = await fetch(TURN_ENDPOINT, { signal: ctl.signal, cache: 'no-store' });
+    clearTimeout(t);
+    const data = r.ok ? await r.json() : null;
+    const extra = data && Array.isArray(data.iceServers) ? data.iceServers.filter(s => s && s.urls) : [];
+    if (extra.length) { PEER_OPTS.config.iceServers = [...ICE, ...extra]; S.hasTurn = true; }
+  } catch (e) {
+    console.warn('TURN indisponível:', e);
+  }
 }
 
 function openPeer() {
@@ -557,8 +574,8 @@ function setupConn(conn, outgoing) {
 // a conexão direta com quem criou a sala falhou: avisa e tenta de novo
 function hostUnreachable() {
   S.hostFails = (S.hostFails || 0) + 1;
-  setStatus(TURN.length
-    ? `Não foi possível conectar com quem criou a sala (tentativa ${S.hostFails}). Tentando de novo…`
+  setStatus(S.hasTurn
+    ?`Não foi possível conectar com quem criou a sala (tentativa ${S.hostFails}). Tentando de novo…`
     : `A rede de vocês bloqueou a conexão direta (tentativa ${S.hostFails}). Tentando de novo… Se continuar, tente outra rede (ex.: roteador do celular).`, true);
   setTimeout(() => { if (S.active && !S.hostReached && S.peer && S.peer.open) connectTo(S.hostId); }, 4000);
 }
