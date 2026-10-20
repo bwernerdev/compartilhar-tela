@@ -12,7 +12,10 @@ Não precisa de conta nem de instalar nada.
 4. Quem abre o link digita o nome, clica em **Entrar** e vê a tela ao vivo.
    Para pôr em **tela cheia**, use o botão no canto do vídeo, o botão da barra ou dê dois cliques no vídeo.
 5. Opcional: o botão do **microfone** liga a sua voz para todos, e o **chat** fica no painel lateral.
-6. **Sair** (botão vermelho) encerra a sua participação.
+6. Opcional: o botão da **câmera** liga a sua webcam. Com alguém apresentando, as câmeras aparecem numa
+   faixa embaixo da tela. Sem apresentação, elas ocupam o centro em grade. Desligar a câmera desliga
+   a webcam de verdade, e a luz dela apaga.
+7. **Sair** (botão vermelho) encerra a sua participação.
 
 ### Qualidade da imagem
 
