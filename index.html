@@ -60,7 +60,17 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
 
 .main{display:grid;grid-template-columns:1fr 340px;gap:12px;padding:0 var(--gutter);min-height:0}
 .main.no-panel{grid-template-columns:1fr}
-.stage{position:relative;background:#000;border-radius:var(--radius);overflow:hidden;min-height:0;display:grid;place-items:center}
+.center{display:flex;flex-direction:column;gap:10px;min-width:0;min-height:0}
+.center:fullscreen{background:var(--bg);padding:12px}
+.stage{flex:1 1 auto;position:relative;background:#000;border-radius:var(--radius);overflow:hidden;min-height:0;display:grid;place-items:center}
+/* câmeras */
+.cams{flex:none;height:clamp(90px,18vh,150px);display:flex;gap:10px;overflow-x:auto;overflow-y:hidden;min-width:0}
+.cams.grid{flex:1 1 auto;height:auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));align-content:center;gap:12px;overflow:auto;min-height:0}
+.cam{position:relative;flex:none;height:100%;aspect-ratio:16/9;background:var(--surface-2);border-radius:12px;overflow:hidden}
+.cams.grid .cam{height:auto;width:100%}
+.cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+.cam.me video{transform:scaleX(-1)}
+.cam .nm{position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,.6);padding:3px 8px;border-radius:6px;font-size:12px;max-width:calc(100% - 16px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* o vídeo fica fora do cálculo do layout: ocupa a área toda e encaixa a imagem inteira, sem cortar */
 .stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;display:block}
 .stage:fullscreen{border-radius:0}
@@ -172,7 +182,9 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
   <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
   <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12 20 4l-6 16-3-7z"/></symbol>
-  <symbol id="i-hd" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9v6M10 9v6M6 12h4M14 9v6h1.5a3 3 0 0 0 0-6z"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10.5 22 7v10l-6-3.5"/></symbol>
+  <symbol id="i-cam-off" viewBox="0 0 24 24"><path d="M10 6h4a2 2 0 0 1 2 2v2.5L22 7v10l-3-1.7M16 16v0a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h1M2 2l20 20"/></symbol>
+  <symbol id="i-hd"viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9v6M10 9v6M6 12h4M14 9v6h1.5a3 3 0 0 0 0-6z"/></symbol>
   <symbol id="i-vol"viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></symbol>
 </svg>
 
@@ -197,7 +209,7 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
         <li>Copie o link que aparece e mande para quem vai assistir.</li>
         <li>Clique em <b>Apresentar</b> e escolha a tela, a janela ou a aba. Marque “Compartilhar áudio” se quiser enviar o som.</li>
         <li>Quem assiste pode pôr em <b>tela cheia</b> (botão ou duplo clique no vídeo).</li>
-        <li>O microfone e o chat são opcionais. Clique no microfone para falar.</li>
+        <li>O microfone, a câmera e o chat são opcionais. Clique no microfone para falar e na câmera para aparecer.</li>
       </ol>
       <p><b>Privacidade:</b> só entra quem tem o link. O código da sala fica depois do “#” no endereço, que nunca é enviado a nenhum servidor. A imagem, o som e o chat vão direto de um computador para o outro, criptografados.</p>
       <p><b>Importante:</b> a sala existe enquanto a aba de quem criou estiver aberta. Se essa aba fechar, quem já está continua conectado, mas ninguém novo entra.</p>
@@ -229,6 +241,7 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
   </header>
 
   <div class="main" id="main">
+   <div class="center" id="center">
     <section class="stage" id="stage" aria-label="Tela compartilhada">
       <video id="video" playsinline autoplay hidden></video>
       <div class="stage-empty" id="stage-empty">
@@ -249,6 +262,9 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
         </div>
       </div>
     </section>
+    <!-- câmeras: faixa embaixo da tela compartilhada, ou grade quando ninguém apresenta -->
+    <div class="cams" id="cams" hidden aria-label="Câmeras"></div>
+   </div>
 
     <aside class="panel" id="panel" aria-label="Painel lateral">
       <div class="tabs" role="tablist">
@@ -269,6 +285,7 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
 
   <nav class="toolbar" aria-label="Controles">
     <button class="tb off" id="btn-mic" type="button" aria-label="Ligar microfone" title="Ligar microfone"><svg><use href="#i-mic-off"/></svg></button>
+    <button class="tb off" id="btn-cam" type="button" aria-label="Ligar câmera" title="Ligar câmera"><svg><use href="#i-cam-off"/></svg></button>
     <button class="tb wide" id="btn-share" type="button"><svg><use href="#i-screen"/></svg><span class="lbl">Apresentar</span></button>
     <div class="qwrap">
       <button class="tb" id="btn-quality" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Qualidade da imagem" title="Qualidade da imagem"><svg><use href="#i-hd"/></svg></button>
@@ -342,7 +359,7 @@ const S = {
   members: new Map(),      // peerId -> membro
   pendingCalls: new Map(), // peerId -> [MediaConnection] chegou antes da verificação
   outCalls: new Map(),     // `${tipo}:${peerId}` -> MediaConnection
-  screen: null, mic: null, micOn: false,
+  screen: null, mic: null, micOn: false, cam: null, camTiles: new Map(),
   hostReached: false, active: false, hostRetries: 0,
   tab: 'people', panelOpen: true, unread: 0, inviteDismissed: false, quality: 'nitidez',
   stageKey: null, joinTimer: null,
@@ -515,6 +532,9 @@ function leaveRoom(sayBye = true) {
   if (sayBye) broadcast({ t: 'bye' });
   if (S.screen) { S.screen.getTracks().forEach(t => t.stop()); S.screen = null; }
   if (S.mic) { S.mic.getTracks().forEach(t => t.stop()); S.mic = null; S.micOn = false; }
+  if (S.cam) { S.cam.getTracks().forEach(t => t.stop()); S.cam = null; }
+  for (const tile of S.camTiles.values()) tile.el.remove();
+  S.camTiles.clear();
   for (const m of S.members.values()) { dropAudio(m); m.screen = null; }
   S.members.clear(); S.outCalls.clear(); S.pendingCalls.clear();
   const v = $('video'); v.srcObject = null;
@@ -538,11 +558,11 @@ function connectTo(id) {
 }
 
 function hello() {
-  return { t: 'hello', code: S.code, name: S.name, mic: S.micOn, presenting: !!S.screen };
+  return { t: 'hello', code: S.code, name: S.name, mic: S.micOn, cam: !!S.cam, presenting: !!S.screen };
 }
 function send(conn, msg) { try { if (conn.open) conn.send(msg); } catch {} }
 function broadcast(msg) { for (const m of verified()) send(m.conn, msg); }
-function broadcastState() { broadcast({ t: 'state', mic: S.micOn, presenting: !!S.screen }); }
+function broadcastState() { broadcast({ t: 'state', mic: S.micOn, cam: !!S.cam, presenting: !!S.screen }); }
 
 function setupConn(conn, outgoing) {
   const old = S.members.get(conn.peer);
@@ -584,6 +604,7 @@ function onData(m, d, timer) {
     m.verified = true;
     m.name = cleanName(d.name);
     m.mic = !!d.mic;
+    m.camOn = !!d.cam;
     m.presenting = !!d.presenting;
     if (!m.outgoing) send(m.conn, hello());
     if (S.isHost) send(m.conn, { t: 'members', ids: verified().filter(x => x !== m).map(x => x.id) });
@@ -594,6 +615,7 @@ function onData(m, d, timer) {
     if (!m.outgoing) addSystem(`${m.name} entrou`);
     if (S.screen) callMember(m, 'screen');
     if (S.mic) callMember(m, 'mic');
+    if (S.cam) callMember(m, 'cam');
     const pend = S.pendingCalls.get(m.id);
     if (pend) { S.pendingCalls.delete(m.id); pend.forEach(c => acceptCall(m, c)); }
     render();
@@ -605,8 +627,9 @@ function onData(m, d, timer) {
         d.ids.slice(0, 50).forEach(id => { if (typeof id === 'string' && id.length < 80 && S.peer && id !== S.peer.id) connectTo(id); });
       break;
     case 'state':
-      m.mic = !!d.mic; m.presenting = !!d.presenting;
+      m.mic = !!d.mic; m.camOn = !!d.cam; m.presenting = !!d.presenting;
       if (!m.presenting) { m.screen = null; m.screenCall = null; }
+      if (!m.camOn) { m.cam = null; m.camCall = null; }
       render();
       break;
     case 'present':
@@ -629,8 +652,8 @@ function removeMember(m) {
   if (S.members.get(m.id) !== m) return;
   S.members.delete(m.id);
   dropAudio(m);
-  m.screen = null;
-  for (const kind of ['screen', 'mic']) closeOut(kind, m.id);
+  m.screen = null; m.cam = null;
+  for (const kind of ['screen', 'mic', 'cam']) closeOut(kind, m.id);
   if (m.verified && S.active) {
     addSystem(`${m.name} saiu`);
     if (m.isHost && !S.isHost && !m.left) toast('A conexão com quem criou a sala caiu. Tentando reconectar…', 5000);
@@ -652,7 +675,7 @@ function watchHost() {
 
 // ---------- mídia ----------
 function callMember(m, kind) {
-  const stream = kind === 'screen' ? S.screen : S.mic;
+  const stream = kind === 'screen' ? S.screen : kind === 'cam' ? S.cam : S.mic;
   if (!stream || !S.peer) return;
   closeOut(kind, m.id);
   const opts = { metadata: { kind } };
@@ -682,17 +705,19 @@ function onCall(call) {
 }
 function acceptCall(m, call) {
   const kind = call.metadata && call.metadata.kind;
-  if (kind !== 'screen' && kind !== 'mic') { try { call.close(); } catch {} return; }
+  if (kind !== 'screen' && kind !== 'mic' && kind !== 'cam') { try { call.close(); } catch {} return; }
   // na resposta, quem assiste pede o som da tela em estéreo e com mais bitrate
   if (kind === 'screen') call.answer(undefined, { sdpTransform: hifiAudio }); else call.answer();
   call.on('stream', stream => {
     if (S.members.get(m.id) !== m) return;
     if (kind === 'screen') { m.screen = stream; m.screenCall = call; m.presenting = true; m.screenAt = Date.now(); }
+    else if (kind === 'cam') { m.cam = stream; m.camCall = call; m.camOn = true; }
     else { m.micCall = call; attachAudio(m, stream); }
     render();
   });
   call.on('close', () => {
     if (kind === 'screen' && m.screenCall === call) { m.screen = null; m.screenCall = null; render(); }
+    if (kind === 'cam' && m.camCall === call) { m.cam = null; m.camCall = null; render(); }
     if (kind === 'mic' && m.micCall === call) dropAudio(m);
   });
   call.on('error', () => {});
@@ -825,6 +850,38 @@ document.addEventListener('click', e => { if (!$('qmenu').hidden && !e.target.cl
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeQualityMenu(); });
 $('video').addEventListener('resize', () => { S.stageKey && renderLabel(); });
 $('btn-mic').addEventListener('click', toggleMic);
+
+// Câmera: desligar para de verdade (apaga a luz da webcam) e fecha as chamadas; ligar liga para todos de novo
+async function toggleCam() {
+  if (S.cam) { stopCam(); return; }
+  if (S.camStarting) return;
+  S.camStarting = true;
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } } });
+  } catch (e) {
+    toast(e.name === 'NotFoundError' ? 'Nenhuma câmera encontrada neste computador.'
+      : e.name === 'NotReadableError' ? 'A câmera está sendo usada por outro programa.'
+      : 'A câmera não foi liberada. Confira a permissão no cadeado ao lado do endereço.', 6000);
+    return;
+  } finally { S.camStarting = false; }
+  if (!S.active) { stream.getTracks().forEach(t => t.stop()); return; }
+  S.cam = stream;
+  const vt = stream.getVideoTracks()[0];
+  if (vt) { vt.contentHint = 'motion'; vt.addEventListener('ended', () => { if (S.cam === stream) stopCam(); }); }
+  verified().forEach(m => callMember(m, 'cam'));
+  broadcastState();
+  render();
+}
+function stopCam() {
+  if (!S.cam) return;
+  S.cam.getTracks().forEach(t => t.stop());
+  S.cam = null;
+  for (const key of [...S.outCalls.keys()]) if (key.startsWith('cam:')) closeOut('cam', key.slice(4));
+  broadcastState();
+  render();
+}
+$('btn-cam').addEventListener('click', toggleCam);
 $('unmute').addEventListener('click', () => {
   const v = $('video'); v.muted = !!S.screen; v.play().catch(() => {});
   for (const m of S.members.values()) if (m.audioEl) m.audioEl.play().catch(() => {});
@@ -833,7 +890,8 @@ $('unmute').addEventListener('click', () => {
 
 // ---------- tela cheia ----------
 function toggleFullscreen() {
-  const stage = $('stage'), v = $('video');
+  // com alguém apresentando, só a tela; sem apresentação, a grade de câmeras
+  const stage = $('stage').hidden ? $('center') : $('stage'), v = $('video');
   if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
   if (stage.requestFullscreen) stage.requestFullscreen().catch(() => toast('Não foi possível entrar em tela cheia.'));
   else if (v.webkitEnterFullscreen && !v.hidden) v.webkitEnterFullscreen(); // iPhone
@@ -922,10 +980,20 @@ function render() {
   $('stage-hint').textContent = presenterWaiting
     ? `${presenterWaiting.name} está apresentando. Carregando a imagem…`
     : canShare() ? 'Clique em Apresentar para mostrar sua tela.' : 'Quando alguém apresentar, a tela aparece aqui.';
+  // câmeras: faixa embaixo da tela quando alguém apresenta; grade no lugar dela quando ninguém apresenta
+  const cams = [];
+  if (S.cam) cams.push({ key: 'me', name: 'Você', stream: S.cam, me: true });
+  for (const m of others) if (m.cam) cams.push({ key: m.id, name: m.name, stream: m.cam, me: false });
+  const camGrid = !owner && cams.length > 0;
+  $('stage').hidden = camGrid;
+  $('cams').hidden = cams.length === 0;
+  $('cams').classList.toggle('grid', camGrid);
+  renderCams(cams);
+
   const fs = !!document.fullscreenElement;
   $('stage-fs').innerHTML = icon(fs ? 'unfull' : 'full');
   $('btn-full').innerHTML = icon(fs ? 'unfull' : 'full');
-  $('btn-full').disabled = !owner;
+  $('btn-full').disabled = !owner && !cams.length;
 
   // convite (só para quem criou, até fechar ou alguém entrar)
   const showInvite = S.isHost && !S.inviteDismissed && others.length === 0 && !owner;
@@ -937,6 +1005,11 @@ function render() {
   mic.classList.toggle('off', !S.micOn);
   mic.innerHTML = icon(S.micOn ? 'mic' : 'mic-off');
   mic.title = mic.ariaLabel = S.micOn ? 'Desligar microfone' : 'Ligar microfone';
+  const cam = $('btn-cam');
+  cam.classList.toggle('off', !S.cam);
+  cam.innerHTML = icon(S.cam ? 'cam' : 'cam-off');
+  cam.title = cam.ariaLabel = S.cam ? 'Desligar câmera' : 'Ligar câmera';
+  cam.hidden = !(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
   const share = $('btn-share');
   share.classList.toggle('active', !!S.screen);
   share.innerHTML = icon(S.screen ? 'stop' : 'screen') + `<span class="lbl">${S.screen ? 'Parar de apresentar' : 'Apresentar'}</span>`;
@@ -960,7 +1033,7 @@ function render() {
   $('pane-chat').hidden = S.tab !== 'chat';
 
   const list = $('people'); list.textContent = '';
-  const me = { id: S.peer && S.peer.id || 'me', name: S.name, mic: S.micOn, presenting: !!S.screen, isHost: S.isHost, me: true };
+  const me = { id: S.peer && S.peer.id || 'me', name: S.name, mic: S.micOn, camOn: !!S.cam, presenting: !!S.screen, isHost: S.isHost, me: true };
   for (const p of [me, ...others]) list.appendChild(personRow(p));
 
   if (S.isHost && S.active && S.peer && S.peer.open && !$('status').classList.contains('warn'))
@@ -970,6 +1043,27 @@ function render() {
 function renderLabel() {
   const v = $('video'), el = $('stage-label');
   el.textContent = S.stageLabel + (S.stageLabel && v.videoWidth ? ` · ${v.videoWidth}×${v.videoHeight}` : '');
+}
+// Reaproveita os quadrinhos de câmera entre renders: só troca o vídeo quando o stream muda
+function renderCams(list) {
+  const box = $('cams'), keep = new Set();
+  list.forEach((c, i) => {
+    keep.add(c.key);
+    let tile = S.camTiles.get(c.key);
+    if (!tile) {
+      const el = document.createElement('div'); el.className = 'cam' + (c.me ? ' me' : '');
+      const v = document.createElement('video'); v.autoplay = true; v.muted = true; v.playsInline = true;
+      const nm = document.createElement('div'); nm.className = 'nm';
+      el.append(v, nm);
+      tile = { el, v, nm, stream: null };
+      S.camTiles.set(c.key, tile);
+    }
+    if (tile.stream !== c.stream) { tile.stream = c.stream; tile.v.srcObject = c.stream; tile.v.play().catch(() => {}); }
+    tile.nm.textContent = c.name;
+    // mexer o vídeo de lugar no DOM pausa ele: só move quando a ordem mudou, e volta a tocar
+    if (box.children[i] !== tile.el) { box.insertBefore(tile.el, box.children[i] || null); tile.v.play().catch(() => {}); }
+  });
+  for (const [key, tile] of S.camTiles) if (!keep.has(key)) { tile.v.srcObject = null; tile.el.remove(); S.camTiles.delete(key); }
 }
 function canShare() { return !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia); }
 function personRow(p) {
@@ -983,6 +1077,7 @@ function personRow(p) {
   who.append(nm); if (sub.textContent) who.append(sub);
   const ic = document.createElement('div'); ic.className = 'ic';
   ic.innerHTML = (p.presenting ? `<span class="on" title="Apresentando">${icon('screen')}</span>` : '')
+    + (p.camOn ? `<span class="on" title="Câmera ligada">${icon('cam')}</span>` : '')
     + `<span class="${p.mic ? 'on' : ''}" title="${p.mic ? 'Microfone ligado' : 'Microfone desligado'}">${icon(p.mic ? 'mic' : 'mic-off')}</span>`;
   li.append(av, who, ic);
   return li;
