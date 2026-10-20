@@ -41,6 +41,25 @@ que está chegando (ex.: `1920×1080`). Se esse número cair, a internet de algu
 
 Qualquer pessoa da sala pode apresentar. Quando alguém começa, quem estava apresentando para.
 
+### Anfitrião e sala de espera
+
+- Quem cria a sala é o **anfitrião**. Quem abre o link fica numa tela de espera ("Pedindo para entrar…"),
+  e o anfitrião vê um aviso com **Aceitar** e **Recusar**.
+- Na aba **Pessoas**, o anfitrião pode desligar **Aprovar quem entra**. Aí qualquer um com o link entra direto.
+- O anfitrião pode **remover** alguém pelo botão ao lado do nome.
+- Se o anfitrião sair, quem entrou primeiro entre os que ficaram vira o anfitrião sozinho, e a sala
+  continua aceitando gente. Se todos saírem, quem abrir o link de novo reabre a sala como anfitrião.
+
+### Durante a chamada
+
+- **Quem está falando:** o avatar (e o quadrinho da câmera) fica com borda verde.
+- **Volume:** cada pessoa com microfone ligado tem um controle de volume na aba Pessoas. O som da tela
+  compartilhada tem o seu, no canto do vídeo.
+- **Janela flutuante:** o botão no canto do vídeo solta a tela compartilhada numa janelinha por cima de
+  tudo, para assistir enquanto faz outra coisa.
+- **Conexão:** embaixo do nome de cada pessoa aparece se a conexão é direta ou "Via TURN", o atraso em ms
+  e a resolução que está chegando. A bolinha fica verde (boa), amarela (razoável) ou vermelha (ruim).
+
 ## Requisitos
 
 - Para apresentar: Chrome, Edge ou Firefox de computador.
@@ -57,13 +76,17 @@ Qualquer pessoa da sala pode apresentar. Quando alguém começa, quem estava apr
 - **Quem entra:** o código da sala (24 caracteres aleatórios, cerca de 120 bits) fica depois do `#` no link.
   Essa parte do endereço nunca é enviada a nenhum servidor. Toda conexão precisa mostrar o código antes de
   receber qualquer coisa da sala (nome, lista de pessoas, chat ou vídeo). Sem o código, a conexão é fechada.
+- **Porta da sala:** cada pessoa tem um endereço aleatório próprio. A sala tem uma "porta", um endereço
+  derivado do código, aberta por quem é o anfitrião. Quem chega bate na porta, é aceito e só então recebe
+  os endereços de quem está dentro. Os outros só aceitam a conexão de quem o anfitrião avisou que admitiu.
 - **Nada fica salvo:** o chat e a lista de pessoas só existem nas abas abertas e somem quando todos saem.
   Só o seu nome fica guardado no seu navegador, para não precisar digitar de novo.
 
 ## Limitações
 
-- A sala depende da aba de quem a criou. Se essa aba fechar, quem já está continua conectado,
-  mas ninguém novo entra até ela voltar (reabrindo o mesmo link na mesma aba).
+- Se a aba do anfitrião travar ou cair sem fechar direito, os outros podem levar até ~30 s para perceber
+  e escolher o novo anfitrião. Fechando a aba ou clicando em Sair, a troca leva cerca de 1 s.
+- Quem estiver com a página antiga aberta (antes da sala de espera) precisa recarregar com Ctrl+F5.
 - Sem servidor TURN (retransmissão), algumas redes bloqueiam a conexão direta: empresa, faculdade,
   4G/5G e provedores com CGNAT. Nesses casos, quem entra vê “A rede de vocês bloqueou a conexão direta”,
   e a página tenta de novo sozinha a cada ~25 s. Para funcionar em qualquer rede, configure o TURN (veja abaixo).
