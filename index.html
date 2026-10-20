@@ -49,7 +49,7 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
 .help p{margin:8px 0}
 
 /* ---------- sala ---------- */
-#room{height:100vh;height:100dvh;display:grid;grid-template-rows:auto 1fr auto}
+#room{height:100vh;height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden}
 .topbar{display:flex;align-items:center;gap:12px;padding:10px var(--gutter);min-height:56px}
 .topbar .title{font-weight:600;white-space:nowrap}
 .status{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
@@ -61,7 +61,8 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
 .main{display:grid;grid-template-columns:1fr 340px;gap:12px;padding:0 var(--gutter);min-height:0}
 .main.no-panel{grid-template-columns:1fr}
 .stage{position:relative;background:#000;border-radius:var(--radius);overflow:hidden;min-height:0;display:grid;place-items:center}
-.stage video{width:100%;height:100%;object-fit:contain;background:#000;display:block}
+/* o vídeo fica fora do cálculo do layout: ocupa a área toda e encaixa a imagem inteira, sem cortar */
+.stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;display:block}
 .stage:fullscreen{border-radius:0}
 .stage-empty{text-align:center;padding:24px;color:var(--muted);max-width:420px}
 .stage-empty .big{width:56px;height:56px;margin:0 auto 12px;border-radius:50%;background:var(--surface-2);display:grid;place-items:center;color:var(--text)}
@@ -133,9 +134,16 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
 @keyframes in{from{opacity:0;transform:translateY(-6px)}}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 
-@media (max-width:820px){
+/* janela estreita (ex.: meia tela num notebook): painel lateral mais fino */
+@media (max-width:1100px){
+  .main{grid-template-columns:1fr 280px;gap:10px}
+  .tb.wide .lbl{display:none}
+  .tb.wide{padding:0 13px}
+}
+@media (max-width:700px){
   .main{grid-template-columns:1fr;padding:0 8px}
-  .panel{position:fixed;inset:auto 0 0 0;height:min(70dvh,560px);border-radius:var(--radius) var(--radius) 0 0;z-index:10;box-shadow:0 -10px 40px rgba(0,0,0,.5)}
+  /* painel flutua acima da barra de botões, sem cobri-la */
+  .panel{position:fixed;left:8px;right:8px;bottom:76px;height:min(60dvh,480px);border-radius:var(--radius);z-index:10;box-shadow:0 -10px 40px rgba(0,0,0,.5)}
   .panel-close{display:grid}
   .topbar .title{display:none}
   .tb{width:44px;height:44px}
@@ -438,7 +446,7 @@ async function enterRoom(asHost) {
   S.hostId = await hostIdFor(S.code);
   $('msgs').querySelectorAll('.msg').forEach(n => n.remove());
   $('chat-empty').hidden = false;
-  S.panelOpen = matchMedia('(min-width: 821px)').matches;
+  S.panelOpen = matchMedia('(min-width: 701px)').matches;
   show('room');
   setStatus(asHost ? 'Abrindo a sala…' : 'Entrando na sala…');
   render();
@@ -848,7 +856,7 @@ $('tab-people').addEventListener('click', () => { S.tab = 'people'; render(); })
 $('tab-chat').addEventListener('click', () => { S.tab = 'chat'; S.unread = 0; render(); });
 $('panel-close').addEventListener('click', () => { S.panelOpen = false; render(); });
 // no celular o painel cobre o vídeo: fecha sozinho quando a tela fica estreita
-matchMedia('(max-width: 820px)').addEventListener('change', e => { if (e.matches && S.panelOpen) { S.panelOpen = false; render(); } });
+matchMedia('(max-width: 700px)').addEventListener('change', e => { if (e.matches && S.panelOpen) { S.panelOpen = false; render(); } });
 $('copy-top').addEventListener('click', copyLink);
 $('invite-copy').addEventListener('click', copyLink);
 $('invite-close').addEventListener('click', () => { S.inviteDismissed = true; render(); });
