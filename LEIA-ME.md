@@ -26,18 +26,28 @@ O botão **HD**, ao lado de Apresentar, escolhe a qualidade de quando você apre
 Dá para trocar no meio da apresentação:
 
 - **Nitidez** (padrão): para texto, código e planilhas. Captura até 1440p a 30 quadros/s, com até 6 Mbps.
-  Se a rede apertar, perde quadros, mas mantém a resolução.
-- **Fluidez**: para jogos e vídeos. Até 1440p a 60 quadros/s, com até 16 Mbps. Usa H.264, que é codificado
-  pela placa de vídeo (NVIDIA, Intel ou AMD), então não pesa na CPU nem atrapalha o jogo. Já começa
-  com bitrate mais alto, para a imagem não ficar borrada nos primeiros segundos.
-  Se a rede apertar, perde resolução, mas mantém o movimento.
-  Trocar para ou de Fluidez no meio da apresentação reconecta a imagem: ela pisca por um instante.
+  Se a rede apertar, perde quadros, mas mantém a resolução. **Em jogo isso aparece como imagem travando
+  "em quadros"**: use um dos modos abaixo.
+- **Jogo (30 qps)**: o recomendado para jogos com internet comum. 30 quadros/s firmes, até 1080p, com até
+  8 Mbps (uns 6 a 8 Mbps de upload por pessoa assistindo). Se a rede apertar, baixa a resolução e mantém os 30 qps.
+- **Fluidez (60 qps)**: para jogos e vídeos com internet boa. Até 1440p a 60 quadros/s, com até 16 Mbps
+  (uns 15 Mbps de upload por pessoa). Se a rede apertar, perde resolução, mas mantém o movimento.
 
-Para 1440p60 chegar inteiro, quem apresenta precisa de uns 15 Mbps de upload por pessoa assistindo.
-Com menos que isso, a resolução baixa sozinha para manter os 60 quadros/s.
+Os dois modos de jogo usam H.264, que é codificado pela placa de vídeo (NVIDIA, Intel ou AMD), então não
+pesam na CPU nem atrapalham o jogo. Eles já começam com bitrate mais alto, para a imagem não ficar
+borrada nos primeiros segundos. Trocar entre Nitidez e um modo de jogo no meio da apresentação reconecta
+a imagem: ela pisca por um instante.
 
-O som do PC vai em estéreo a 128 kbps, sem os filtros de voz. Quem assiste vê no canto do vídeo a resolução
-que está chegando (ex.: `1920×1080`). Se esse número cair, a internet de alguém está segurando a qualidade.
+**O que está acontecendo de verdade:** quem apresenta vê no canto do vídeo o que está saindo
+(ex.: "enviando 1920×1080 30 qps · limitado pela internet"). Quem assiste vê a resolução e os qps que
+estão chegando. Se a página perceber que a imagem trava no Nitidez por falta de internet, ela sugere o
+modo Jogo.
+
+**Dicas para jogos:** capture a **tela inteira**, não a janela do jogo, e deixe o jogo em **janela sem
+bordas** (borderless) em vez de tela cheia exclusiva. Alguns jogos em tela cheia exclusiva entregam poucos
+quadros para a captura.
+
+O som do PC vai em estéreo a 128 kbps, sem os filtros de voz.
 
 Qualquer pessoa da sala pode apresentar. Quando alguém começa, quem estava apresentando para.
 

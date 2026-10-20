@@ -345,7 +345,8 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
       <div class="qmenu" id="qmenu" role="menu" hidden>
         <div class="qhead">Qualidade de quando você apresenta</div>
         <button class="qopt" role="menuitemradio" data-q="nitidez" type="button"><b>Nitidez</b><span></span></button>
-        <button class="qopt" role="menuitemradio" data-q="fluidez" type="button"><b>Fluidez</b><span></span></button>
+        <button class="qopt" role="menuitemradio" data-q="jogo30" type="button"><b>Jogo (30 qps)</b><span></span></button>
+        <button class="qopt" role="menuitemradio" data-q="fluidez" type="button"><b>Fluidez (60 qps)</b><span></span></button>
         <div class="qfoot">A imagem melhora sozinha nos primeiros segundos. Internet lenta de quem apresenta ou de quem assiste reduz a qualidade.</div>
       </div>
     </div>
@@ -396,8 +397,15 @@ const QUALITY = {
     hint: 'detail', degradation: 'maintain-resolution', maxBitrate: 6_000_000, maxFramerate: 30,
     video: { width: { ideal: 2560 }, height: { ideal: 1440 }, frameRate: { ideal: 30, max: 30 } },
   },
+  // 30 qps firmes: se a internet apertar, baixa a resolução em vez de engasgar. Metade do tráfego do 60.
+  jogo30: {
+    title: 'Jogo (30 qps)', desc: 'Movimento estável a 30 quadros/s, até 1080p. Bom para jogar com internet comum.',
+    hint: 'motion', degradation: 'maintain-framerate', maxBitrate: 8_000_000, maxFramerate: 30,
+    codec: 'H264', startKbps: 3000,
+    video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30, max: 30 } },
+  },
   fluidez: {
-    title: 'Fluidez', desc: 'Para jogos e vídeos. Até 1440p a 60 quadros/s.',
+    title: 'Fluidez (60 qps)', desc: 'Para jogos e vídeos com internet boa. Até 1440p a 60 quadros/s.',
     hint: 'motion', degradation: 'maintain-framerate', maxBitrate: 16_000_000, maxFramerate: 60,
     // H.264 usa o codificador da placa de vídeo (NVENC/QuickSync/AMF): 1440p60 sem travar a CPU
     codec: 'H264', startKbps: 4000,
@@ -422,7 +430,7 @@ const S = {
   rows: new Map(),        // peerId -> linha da lista de pessoas (atualizada no lugar)
   meters: new Map(),      // peerId|'me' -> medidor de volume da voz
   vol: new Map(),         // peerId -> volume escolhido (0..1)
-  tab: 'people', panelOpen: true, unread: 0, inviteDismissed: false, quality: 'nitidez',
+  tab: 'people', panelOpen: true, unread: 0, inviteDismissed: false, quality: 'nitidez', lowFps: 0, send: null,
   stageKey: null, joinTimer: null, screenVol: 1,
 };
 
@@ -1425,7 +1433,43 @@ function render() {
 // rótulo do palco com a resolução que está chegando de verdade (ajuda a ver se a rede está segurando a qualidade)
 function renderLabel() {
   const v = $('video'), el = $('stage-label');
-  el.textContent = S.stageLabel + (S.stageLabel && v.videoWidth ? ` · ${v.videoWidth}×${v.videoHeight}` : '');
+  let text = S.stageLabel;
+  if (text && S.screen && S.send) {
+    // quem apresenta vê o que está saindo de verdade e o que está segurando a qualidade
+    const s = S.send;
+    text = 'Você está apresentando · enviando ' + (s.w ? `${s.w}×${s.h} ` : '') + `${s.fps} qps`
+      + (s.limit === 'bandwidth' ? ' · limitado pela internet' : s.limit === 'cpu' ? ' · limitado pelo processador' : '')
+      + (s.hw === false ? ' · codificando no processador' : '');
+  } else if (text && v.videoWidth) {
+    text += ` · ${v.videoWidth}×${v.videoHeight}`;
+    const p = !S.screen && verified().find(m => m.screen === S.stageStream);
+    if (p && p.net && p.net.fps) text += ` ${p.net.fps} qps`;
+  }
+  el.textContent = text;
+  el.title = text;
+}
+// estatísticas do envio da tela (pior caso entre quem assiste) e dica quando a imagem trava
+async function updateSendStats() {
+  if (!S.screen) { S.send = null; return; }
+  let worst = null;
+  for (const [key, call] of S.outCalls) {
+    if (!key.startsWith('screen:') || !call.peerConnection) continue;
+    try {
+      (await call.peerConnection.getStats()).forEach(r => {
+        if (r.type !== 'outbound-rtp' || r.kind !== 'video') return;
+        const s = { w: r.frameWidth, h: r.frameHeight, fps: Math.round(r.framesPerSecond || 0), limit: r.qualityLimitationReason, hw: r.powerEfficientEncoder };
+        if (!worst || s.fps < worst.fps) worst = s;
+      });
+    } catch {}
+  }
+  S.send = worst;
+  if (worst && QUALITY[S.quality].degradation === 'maintain-resolution' && worst.limit && worst.limit !== 'none' && worst.fps < 18) {
+    if (++S.lowFps === 3 && !S.tipShown) {
+      S.tipShown = true;
+      toast('A imagem está saindo travada: a internet não dá conta da resolução. Para jogos, troque a qualidade (botão HD) para “Jogo (30 qps)”.', 10000);
+    }
+  } else S.lowFps = 0;
+  renderLabel();
 }
 // Reaproveita os quadrinhos de câmera entre renders: só troca o vídeo quando o stream muda
 function renderCams(list) {
@@ -1554,9 +1598,14 @@ function setSpeaking(key, on) {
 
 // ---------- qualidade da conexão por pessoa ----------
 async function updateNet() {
-  for (const m of verified()) {
+  await updateSendStats();
+  for (const m of verified()) await updateMemberNet(m);
+  renderLabel(); // o rótulo do vídeo mostra os qps que estão chegando
+}
+async function updateMemberNet(m) {
+  {
     const pc = m.conn.peerConnection;
-    if (!pc) continue;
+    if (!pc) return;
     try {
       const st = await pc.getStats();
       let pair = null;

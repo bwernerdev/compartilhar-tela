@@ -26,7 +26,7 @@ textos de interface, comentários e commits são em português.
   grátis (TCP dá 401). Esconder a senha exigiria o TURN da Cloudflare (Worker com credenciais temporárias).
 
 ## Mapa do `index.html` (seções do script, na ordem)
-- **Constantes:** `TURN`, `ICE`, `PEER_OPTS`, `QUALITY` (nitidez/fluidez), `SCREEN_AUDIO_BITRATE`,
+- **Constantes:** `TURN`, `ICE`, `PEER_OPTS`, `QUALITY` (nitidez / jogo30 / fluidez), `SCREEN_AUDIO_BITRATE`,
   `PROTO` (versão do protocolo, hoje 2), `CODE_RE`, e o estado global `S`.
 - **utilidades:** `store`/`load` (localStorage com try), `newCode` (24 caracteres, ~120 bits),
   `hostIdFor` (SHA-256 do código, vira o id da porta), `cleanName`, `toast`, `setStatus`, `copyLink`.
@@ -46,7 +46,7 @@ textos de interface, comentários e commits são em português.
   `renderPeople`/`makeRow` (linhas persistentes em `S.rows`), `paintNet`.
 - **quem está falando:** `startAudio`, `stopAudio`, `watchLevel`, `unwatchLevel`, `tickLevels`,
   `setSpeaking` (AnalyserNode, intervalo de 150 ms).
-- **qualidade da conexão:** `updateNet` (getStats a cada 2 s: direta ou TURN, RTT, resolução, perda).
+- **qualidade da conexão:** `updateNet` → `updateSendStats` (o que quem apresenta envia, e a dica de trocar para o modo Jogo) e `updateMemberNet` (direta ou TURN, RTT, resolução, perda), a cada 2 s.
 - **pedidos para entrar:** `renderKnocks`. Depois vêm os handlers de janela flutuante e volume da tela.
 
 ## Protocolo da sala (PROTO = 2)
