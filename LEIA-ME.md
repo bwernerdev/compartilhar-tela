@@ -58,6 +58,13 @@ Qualquer pessoa da sala pode apresentar. Quando alguém começa, quem estava apr
 - O aviso do Chrome “… está compartilhando sua tela” não pode ser escondido pela página. É uma proteção do
   navegador. Clique em **Ocultar** para tirá-lo da frente.
 
+## App para apresentar sem o aviso do Chrome
+
+A pasta [`app`](app/LEIA-ME.md) tem um app de Windows (`app\dist\Tela Compartilhada.exe`, portátil) para quem
+**apresenta**. Ele abre esta mesma página, mas captura a tela por conta própria, com um seletor de tela/janela em
+português e o som do PC. Assim a barra “… está compartilhando sua tela” não aparece. Quem assiste continua usando
+só o link no navegador. Instruções em [`app/LEIA-ME.md`](app/LEIA-ME.md).
+
 ## TURN (para funcionar em qualquer rede)
 
 A página usa o [ExpressTURN](https://www.expressturn.com). O plano grátis cobre 1000 GB por mês e tem servidor em São Paulo.

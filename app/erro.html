@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>Tela Compartilhada</title>
+<style>
+:root{font-family:system-ui,"Segoe UI",Roboto,Arial,sans-serif;color-scheme:dark}
+html,body{margin:0;height:100%}
+body{background:#0f1115;color:#e8eaed;display:grid;place-items:center;padding:32px 16px;box-sizing:border-box}
+.card{max-width:440px}
+h1{font-size:26px;font-weight:600;margin:0 0 8px}
+p{color:#9aa0a6;margin:0 0 24px;line-height:1.45}
+button{font:inherit;font-weight:600;border:0;border-radius:999px;padding:12px 20px;background:#8ab4f8;color:#0b1b33;cursor:pointer}
+small{display:block;margin-top:24px;color:#6f757c}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Não foi possível abrir a página</h1>
+  <p>Confira a internet e tente de novo. O app carrega a página da sala pela internet, como o navegador.</p>
+  <button id="de-novo" type="button" autofocus>Tentar de novo</button>
+  <small id="detalhe"></small>
+</div>
+<script>
+const q = new URLSearchParams(location.search);
+const url = q.get('u') || '';
+document.getElementById('detalhe').textContent = q.get('d') || '';
+document.getElementById('de-novo').addEventListener('click', () => { if (/^https?:\/\//.test(url)) location.href = url; else history.back(); });
+</script>
+</body>
+</html>

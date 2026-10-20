@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>Escolha o que apresentar</title>
+<style>
+:root{
+  --bg:#1b1e24; --surface:#262a32; --surface-2:#30353f; --border:#2f333b; --text:#e8eaed; --muted:#9aa0a6;
+  --accent:#8ab4f8; --accent-ink:#0b1b33;
+  font-family:system-ui,"Segoe UI",Roboto,Arial,sans-serif; color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font-size:14px;display:grid;grid-template-rows:auto auto 1fr auto;-webkit-font-smoothing:antialiased;user-select:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+button:focus-visible,.card:focus-visible,label:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+header{padding:20px 24px 4px}
+h1{font-size:20px;font-weight:600;margin:0 0 4px}
+header p{margin:0;color:var(--muted)}
+.tabs{display:flex;gap:4px;padding:12px 24px 0;border-bottom:1px solid var(--border)}
+.tab{padding:10px 14px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent}
+.tab[aria-selected=true]{color:var(--accent);border-bottom-color:var(--accent)}
+.grid{overflow:auto;padding:16px 24px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;align-content:start}
+.card{display:flex;flex-direction:column;gap:8px;padding:8px;border-radius:12px;text-align:left;background:transparent;border:2px solid transparent}
+.card:hover{background:var(--surface)}
+.card[aria-checked=true]{border-color:var(--accent);background:var(--surface)}
+.thumb{aspect-ratio:16/10;border-radius:8px;background:#000 center/contain no-repeat;display:grid;place-items:center;overflow:hidden}
+.thumb img{width:100%;height:100%;object-fit:contain;display:block}
+.thumb .vazio{color:var(--muted);font-size:12px;padding:8px;text-align:center}
+.nome{display:flex;align-items:center;gap:8px;min-width:0}
+.nome img{width:16px;height:16px;flex:none}
+.nome span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vazio-lista{grid-column:1/-1;color:var(--muted);text-align:center;padding:40px}
+footer{display:flex;align-items:center;gap:12px;padding:14px 24px;border-top:1px solid var(--border);flex-wrap:wrap}
+.som{display:flex;align-items:center;gap:10px;flex:1;min-width:240px;cursor:pointer;border-radius:8px;padding:4px}
+.som input{width:18px;height:18px;accent-color:var(--accent);margin:0}
+.som small{display:block;color:var(--muted)}
+.btn{padding:10px 20px;border-radius:999px;font-weight:600}
+.btn-primary{background:var(--accent);color:var(--accent-ink)}
+.btn-primary:disabled{opacity:.45;cursor:default}
+.btn-ghost{color:var(--accent)}
+.btn-ghost:hover{background:var(--surface)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Escolha o que apresentar</h1>
+  <p>Quem está na sala vai ver o que você escolher. Pelo app, não aparece a barra “está compartilhando sua tela”.</p>
+</header>
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" data-tipo="tela" aria-selected="true" type="button">Tela inteira</button>
+  <button class="tab" role="tab" data-tipo="janela" aria-selected="false" type="button">Janela</button>
+</div>
+<main class="grid" id="grid" role="radiogroup" aria-label="Fontes"></main>
+<footer>
+  <label class="som" id="som-wrap">
+    <input type="checkbox" id="som" checked>
+    <span>Compartilhar o som do computador<small>Vai tudo o que toca no PC, não só o da janela escolhida.</small></span>
+  </label>
+  <button class="btn btn-ghost" id="cancelar" type="button">Cancelar</button>
+  <button class="btn btn-primary" id="apresentar" type="button" disabled>Apresentar</button>
+</footer>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+let fontes = [], tipo = 'tela', escolhida = '';
+
+async function atualizar() {
+  const r = await window.seletor.listar();
+  if (!r) return;
+  fontes = r.fontes;
+  $('som-wrap').hidden = !r.audio;
+  // com uma tela só, já deixa ela marcada
+  const telas = fontes.filter(f => f.tipo === 'tela');
+  if (!escolhida && telas.length === 1) escolhida = telas[0].id;
+  if (escolhida && !fontes.some(f => f.id === escolhida)) escolhida = '';
+  desenhar();
+}
+
+const cards = new Map(); // id -> botão (reaproveitado a cada atualização, para não perder clique nem foco)
+function card(f) {
+  let b = cards.get(f.id);
+  if (!b) {
+    b = document.createElement('button');
+    b.type = 'button'; b.className = 'card'; b.dataset.id = f.id; b.setAttribute('role', 'radio');
+    b.innerHTML = '<div class="thumb"><img alt=""><div class="vazio">Sem prévia (janela minimizada?)</div></div><div class="nome"><img alt=""><span></span></div>';
+    b.addEventListener('click', () => { escolhida = f.id; desenhar(); });
+    b.addEventListener('dblclick', () => { escolhida = f.id; apresentar(); });
+    cards.set(f.id, b);
+  }
+  const [mini, icone] = b.querySelectorAll('img');
+  const src = f.miniatura || previas.get(f.id) || '';
+  if (src && mini.src !== src) mini.src = src;
+  mini.hidden = !src;
+  const vazio = b.querySelector('.vazio');
+  vazio.hidden = !!src;
+  vazio.textContent = tentadas.has(f.id) ? 'Sem prévia (janela minimizada?)' : 'Carregando prévia…';
+  if (f.icone) icone.src = f.icone;
+  icone.hidden = !f.icone;
+  const s = b.querySelector('span'); s.textContent = s.title = f.nome;
+  b.ariaChecked = String(f.id === escolhida);
+  return b;
+}
+
+function desenhar() {
+  for (const t of document.querySelectorAll('.tab')) t.ariaSelected = String(t.dataset.tipo === tipo);
+  const lista = fontes.filter(f => f.tipo === tipo);
+  for (const id of cards.keys()) if (!fontes.some(f => f.id === id)) { cards.get(id).remove(); cards.delete(id); }
+  const els = lista.map(card);
+  if (!lista.length) {
+    const p = document.createElement('div'); p.className = 'vazio-lista';
+    p.textContent = tipo === 'tela' ? 'Nenhuma tela encontrada.' : 'Nenhuma janela aberta para mostrar.';
+    els.push(p);
+  }
+  const grid = $('grid');
+  if (els.length !== grid.children.length || els.some((el, i) => grid.children[i] !== el)) grid.replaceChildren(...els);
+  $('apresentar').disabled = !escolhida;
+}
+
+// Prévias das janelas: no Windows a miniatura do Electron volta vazia, então cada janela é
+// capturada por um instante (um quadro só) e a captura é fechada em seguida.
+const previas = new Map(), tentadas = new Set();
+async function previa(id) {
+  let st = null, fim = false;
+  const prazo = new Promise(r => setTimeout(r, 8000, null)); // janela parada demora a mandar o 1º quadro; invisível nunca manda
+  const pedir = navigator.mediaDevices.getUserMedia({ audio: false, video: { mandatory: {
+    chromeMediaSource: 'desktop', chromeMediaSourceId: id, maxWidth: 400, maxHeight: 250, maxFrameRate: 5 } } })
+    .then(s => { if (fim) { s.getTracks().forEach(t => t.stop()); return null; } return (st = s); }, () => null);
+  try {
+    if (!await Promise.race([pedir, prazo])) return;
+    const v = document.createElement('video'); v.muted = true; v.srcObject = st;
+    await v.play();
+    const ok = await Promise.race([new Promise(r => v.requestVideoFrameCallback(() => r(true))), prazo.then(() => false)]);
+    if (ok && v.videoWidth) {
+      const c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight;
+      c.getContext('2d').drawImage(v, 0, 0);
+      previas.set(id, c.toDataURL('image/jpeg', 0.85));
+    }
+  } catch {} finally {
+    fim = true; tentadas.add(id);
+    if (st) st.getTracks().forEach(t => t.stop());
+  }
+}
+async function atualizarPrevias() {
+  for (;;) {
+    const ids = fontes.filter(f => f.tipo === 'janela').map(f => f.id);
+    let i = 0;
+    await Promise.all([0, 1, 2, 3].map(async () => { while (i < ids.length) { await previa(ids[i++]); desenhar(); } }));
+    await new Promise(r => setTimeout(r, 4000));
+  }
+}
+
+function apresentar() { if (escolhida) window.seletor.escolher(escolhida, $('som').checked); }
+
+for (const t of document.querySelectorAll('.tab')) t.addEventListener('click', () => { tipo = t.dataset.tipo; desenhar(); });
+$('apresentar').addEventListener('click', apresentar);
+$('cancelar').addEventListener('click', () => window.seletor.cancelar());
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') window.seletor.cancelar();
+  else if (e.key === 'Enter' && escolhida && !e.target.closest('.tab,#cancelar,.som')) { e.preventDefault(); apresentar(); }
+});
+
+atualizar().then(atualizarPrevias);
+setInterval(atualizar, 3000); // prévias ao vivo e janelas que abrem ou fecham
+</script>
+</body>
+</html>
