@@ -28,10 +28,11 @@ Dá para trocar no meio da apresentação:
 - **Nitidez** (padrão): para texto, código e planilhas. Captura até 1440p a 30 quadros/s, com até 6 Mbps.
   Se a rede apertar, perde quadros, mas mantém a resolução. **Em jogo isso aparece como imagem travando
   "em quadros"**: use um dos modos abaixo.
-- **Jogo (30 qps)**: o recomendado para jogos com internet comum. 30 quadros/s firmes, até 1080p, com até
-  8 Mbps (uns 6 a 8 Mbps de upload por pessoa assistindo). Se a rede apertar, baixa a resolução e mantém os 30 qps.
-- **Fluidez (60 qps)**: para jogos e vídeos com internet boa. Até 1440p a 60 quadros/s, com até 16 Mbps
-  (uns 15 Mbps de upload por pessoa). Se a rede apertar, perde resolução, mas mantém o movimento.
+- **Jogo (30 qps)**: o recomendado para jogos. 30 quadros/s firmes, até 1080p, com até 14 Mbps.
+  Se faltar internet, a página baixa a resolução em degraus (1080p → 864p → 720p → 540p) para manter
+  os 30 qps, e sobe de novo quando sobra folga. No canto do vídeo aparece "resolução reduzida para manter os quadros".
+- **Fluidez (60 qps)**: para jogos e vídeos com internet boa. Até 1440p a 60 quadros/s, com até 20 Mbps
+  (uns 20 Mbps de upload por pessoa). Também baixa a resolução sozinho se faltar internet. Se a rede apertar, perde resolução, mas mantém o movimento.
 
 Os dois modos de jogo usam H.264, que é codificado pela placa de vídeo (NVIDIA, Intel ou AMD), então não
 pesam na CPU nem atrapalham o jogo. Eles já começam com bitrate mais alto, para a imagem não ficar

@@ -2,7 +2,7 @@
 
 Leia isto antes de abrir o código: o `index.html` tem ~1650 linhas. Use os nomes de função abaixo
 com Grep (`function nome`) e leia só o trecho necessário. Instruções para o usuário ficam em
-`LEIA-ME.md`, não aqui.
+`LEIA-ME.md`,  (ajuste automático de resolução: o H.264 por hardware descarta quadros em vez de baixar a resolução ao bater no teto de bitrate, então descemos  em degraus ), não aqui.
 
 ## O que é
 Compartilhamento de tela estilo Google Meet num arquivo só (`index.html`), sem build e sem servidor
@@ -39,6 +39,9 @@ textos de interface, comentários e commits são em português.
 - **mídia:** `callMember`, `closeOut`, `onCall`, `acceptCall`, `attachAudio`, `hifiAudio`,
   `screenSdp` (H.264 primeiro, bitrate inicial), `tuneSender`/`tuneCall`/`retuneAll` (bitrate e
   `degradationPreference`), `setQuality`, `dropAudio`, `startPresenting`, `stopPresenting`,
+  `adaptScreen` (fica perto de `renderCams`; nos modos de jogo desce `scaleResolutionDownBy` em
+  degraus `SCALE_STEPS` quando os qps caem encostados no teto, porque o H.264 por hardware descarta
+  quadros em vez de baixar a resolução),
   `toggleMic`, `toggleCam`, `stopCam`.
 - **tela cheia / painel / chat:** `toggleFullscreen`, `openPanel`, `addChat`, `addSystem`, `appendMsg`.
 - **imagens no chat:** `sendImage`, `shrinkImage` (até 1920 px, WebP), `onImagePart`, `openLightbox`.

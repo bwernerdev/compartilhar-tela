@@ -399,14 +399,14 @@ const QUALITY = {
   },
   // 30 qps firmes: se a internet apertar, baixa a resolução em vez de engasgar. Metade do tráfego do 60.
   jogo30: {
-    title: 'Jogo (30 qps)', desc: 'Movimento estável a 30 quadros/s, até 1080p. Bom para jogar com internet comum.',
-    hint: 'motion', degradation: 'maintain-framerate', maxBitrate: 8_000_000, maxFramerate: 30,
+    title: 'Jogo (30 qps)', desc: 'Movimento estável a 30 quadros/s, até 1080p. Se faltar internet, baixa a resolução, não os quadros.',
+    hint: 'motion', degradation: 'maintain-framerate', maxBitrate: 14_000_000, maxFramerate: 30,
     codec: 'H264', startKbps: 3000,
     video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30, max: 30 } },
   },
   fluidez: {
     title: 'Fluidez (60 qps)', desc: 'Para jogos e vídeos com internet boa. Até 1440p a 60 quadros/s.',
-    hint: 'motion', degradation: 'maintain-framerate', maxBitrate: 16_000_000, maxFramerate: 60,
+    hint: 'motion', degradation: 'maintain-framerate', maxBitrate: 20_000_000, maxFramerate: 60,
     // H.264 usa o codificador da placa de vídeo (NVENC/QuickSync/AMF): 1440p60 sem travar a CPU
     codec: 'H264', startKbps: 4000,
     video: { width: { ideal: 2560 }, height: { ideal: 1440 }, frameRate: { ideal: 60, max: 60 } },
@@ -1017,14 +1017,14 @@ function screenSdp(sdp, meta) {
   return lines.join('\r\n');
 }
 // Libera mais bitrate para o vídeo da tela e diz ao codificador o que preservar quando a rede apertar
-async function tuneSender(sender) {
+async function tuneSender(sender, scale = 1) {
   const q = QUALITY[S.quality];
   if (!sender.track) return;
   let p;
   try { p = sender.getParameters(); } catch { return; }
   if (!p.encodings || !p.encodings.length) return; // ainda negociando; tenta de novo ao conectar
   if (sender.track.kind === 'video') {
-    Object.assign(p.encodings[0], { maxBitrate: q.maxBitrate, maxFramerate: q.maxFramerate, scaleResolutionDownBy: 1 });
+    Object.assign(p.encodings[0], { maxBitrate: q.maxBitrate, maxFramerate: q.maxFramerate, scaleResolutionDownBy: scale });
     try { await sender.setParameters({ ...p, degradationPreference: q.degradation }); return; } catch {}
   } else {
     p.encodings[0].maxBitrate = SCREEN_AUDIO_BITRATE;
@@ -1034,7 +1034,8 @@ async function tuneSender(sender) {
 function tuneCall(call) {
   const pc = call.peerConnection;
   if (!pc) return;
-  const apply = () => pc.getSenders().forEach(tuneSender);
+  call._ad = { step: 0, low: 0, high: 0, cool: 0, bytes: null, t: 0 }; // estado do ajuste automático (adaptScreen)
+  const apply = () => pc.getSenders().forEach(s => tuneSender(s, SCALE_STEPS[call._ad.step]));
   apply();
   pc.addEventListener('connectionstatechange', () => { if (pc.connectionState === 'connected') apply(); });
 }
@@ -1438,6 +1439,7 @@ function renderLabel() {
     // quem apresenta vê o que está saindo de verdade e o que está segurando a qualidade
     const s = S.send;
     text = 'Você está apresentando · enviando ' + (s.w ? `${s.w}×${s.h} ` : '') + `${s.fps} qps`
+      + (s.scaled ? ' · resolução reduzida para manter os quadros' : '')
       + (s.limit === 'bandwidth' ? ' · limitado pela internet' : s.limit === 'cpu' ? ' · limitado pelo processador' : '')
       + (s.hw === false ? ' · codificando no processador' : '');
   } else if (text && v.videoWidth) {
@@ -1455,11 +1457,19 @@ async function updateSendStats() {
   for (const [key, call] of S.outCalls) {
     if (!key.startsWith('screen:') || !call.peerConnection) continue;
     try {
-      (await call.peerConnection.getStats()).forEach(r => {
-        if (r.type !== 'outbound-rtp' || r.kind !== 'video') return;
-        const s = { w: r.frameWidth, h: r.frameHeight, fps: Math.round(r.framesPerSecond || 0), limit: r.qualityLimitationReason, hw: r.powerEfficientEncoder };
-        if (!worst || s.fps < worst.fps) worst = s;
+      const st = await call.peerConnection.getStats();
+      let out = null, availKbps = null;
+      st.forEach(r => {
+        if (r.type === 'outbound-rtp' && r.kind === 'video') out = r;
+        if (r.type === 'transport' && r.selectedCandidatePairId) {
+          const pair = st.get(r.selectedCandidatePairId);
+          if (pair && pair.availableOutgoingBitrate) availKbps = pair.availableOutgoingBitrate / 1000;
+        }
       });
+      if (!out) continue;
+      const s = { w: out.frameWidth, h: out.frameHeight, fps: Math.round(out.framesPerSecond || 0), limit: out.qualityLimitationReason, hw: out.powerEfficientEncoder };
+      s.scaled = adaptScreen(call, out, availKbps) > 0;
+      if (!worst || s.fps < worst.fps) worst = s;
     } catch {}
   }
   S.send = worst;
@@ -1470,6 +1480,42 @@ async function updateSendStats() {
     }
   } else S.lowFps = 0;
   renderLabel();
+}
+/*
+  Ajuste automático de resolução nos modos de jogo (maintain-framerate).
+  O codificador por hardware (H.264) não baixa a resolução sozinho: quando bate no teto de bitrate
+  (do modo ou da internet), ele descarta quadros, e a imagem fica "em quadros". Aqui, se os qps caem e o
+  envio está encostado no limite, a resolução desce um degrau; com folga por um tempo, sobe de novo.
+  Cada pessoa assistindo tem o seu codificador, então o ajuste é por chamada.
+*/
+const SCALE_STEPS = [1, 1.25, 1.5, 2]; // 1080p → 864p → 720p → 540p (1440p → 1152p → 960p → 720p)
+function adaptScreen(call, out, availKbps) {
+  const ad = call._ad;
+  const q = QUALITY[S.quality];
+  if (!ad) return 0;
+  const now = out.timestamp, bytes = out.bytesSent;
+  const kbps = ad.bytes != null && now > ad.t ? (bytes - ad.bytes) * 8 / (now - ad.t) : null; // bytes/ms → kbps
+  ad.bytes = bytes; ad.t = now;
+  if (q.degradation !== 'maintain-framerate') { // Nitidez: resolução fixa
+    if (ad.step) { ad.step = 0; call.peerConnection.getSenders().forEach(s => tuneSender(s, 1)); }
+    return 0;
+  }
+  if (kbps == null || !out.framesPerSecond) return ad.step;
+  if (ad.cool > 0) { ad.cool--; return ad.step; }
+  const limitKbps = Math.min(q.maxBitrate / 1000, availKbps || Infinity);
+  const fps = out.framesPerSecond, target = q.maxFramerate;
+  const choked = fps < target * 0.8 && kbps > limitKbps * 0.8; // perdendo quadros por falta de bitrate
+  const roomy = fps >= target * 0.9 && kbps < limitKbps * 0.55; // sobrando bastante
+  ad.low = choked ? ad.low + 1 : 0;
+  ad.high = roomy ? ad.high + 1 : 0;
+  let next = ad.step;
+  if (ad.low >= 2 && ad.step < SCALE_STEPS.length - 1) next = ad.step + 1; // ~4 s travando: desce
+  else if (ad.high >= 8 && ad.step > 0) next = ad.step - 1;                // ~16 s folgado: sobe
+  if (next !== ad.step) {
+    ad.step = next; ad.low = 0; ad.high = 0; ad.cool = 2;
+    call.peerConnection.getSenders().forEach(s => tuneSender(s, SCALE_STEPS[next]));
+  }
+  return ad.step;
 }
 // Reaproveita os quadrinhos de câmera entre renders: só troca o vídeo quando o stream muda
 function renderCams(list) {
