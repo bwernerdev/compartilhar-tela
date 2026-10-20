@@ -294,9 +294,15 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
   - Acesso: o código da sala vai no "#" do link. Toda conexão precisa provar que sabe
     o código antes de receber qualquer dado da sala.
 */
+// Servidor de retransmissão (TURN). Sem ele, redes que bloqueiam conexão direta (CGNAT, empresa, 4G)
+// ficam em "tentando conectar". Preencha com as credenciais do seu provedor de TURN.
+const TURN = [
+  // { urls: ['turn:HOST:3478?transport=udp', 'turn:HOST:3478?transport=tcp'], username: 'USUARIO', credential: 'SENHA' },
+];
 const ICE = [
   { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
   { urls: 'stun:stun.cloudflare.com:3478' },
+  ...TURN,
 ];
 const PEER_OPTS = { config: { iceServers: ICE }, debug: 1 };
 // Qualidade da transmissão. "Nitidez" guarda a resolução (texto legível); "Fluidez" guarda os quadros por segundo.
@@ -422,7 +428,7 @@ window.addEventListener('hashchange', () => { if (!S.active) setupLobby(); });
 async function enterRoom(asHost) {
   if (typeof Peer === 'undefined') { ended('Não foi possível carregar a página', 'A biblioteca de conexão (PeerJS) não carregou. Verifique a internet e recarregue.', false); return; }
   if (!window.RTCPeerConnection || !crypto.subtle) { ended('Navegador sem suporte', 'Use uma versão recente do Chrome, Edge, Firefox ou Safari, num endereço https.', false); return; }
-  S.isHost = asHost; S.active = true; S.hostReached = asHost; S.hostRetries = 0;
+  S.isHost = asHost; S.active = true; S.hostReached = asHost; S.hostRetries = 0; S.hostFails = 0;
   S.unread = 0; S.inviteDismissed = !asHost; S.stageKey = null;
   S.hostId = await hostIdFor(S.code);
   $('msgs').querySelectorAll('.msg').forEach(n => n.remove());
@@ -446,7 +452,7 @@ function openPeer() {
       connectTo(S.hostId);
       clearTimeout(S.joinTimer);
       S.joinTimer = setTimeout(() => {
-        if (S.active && !S.hostReached) setStatus('Ainda tentando conectar… Se demorar, a rede pode estar bloqueando conexões diretas (veja “Como usar”).', true);
+        if (S.active && !S.hostReached && !S.hostFails) setStatus('Ainda tentando conectar… Se demorar, a rede pode estar bloqueando conexões diretas (veja “Como usar”).', true);
       }, 15000);
     }
   });
@@ -532,12 +538,29 @@ function setupConn(conn, outgoing) {
               isHost: conn.peer === S.hostId, screen: null, screenCall: null, micCall: null, audioEl: null };
   S.members.set(conn.peer, m);
   if (old) try { old.conn.close(); } catch {}
-  const timer = setTimeout(() => { if (!m.verified) try { conn.close(); } catch {} }, 20000);
+  const fail = () => {
+    if (m.failed) return;
+    m.failed = true;
+    if (outgoing && m.isHost && !S.hostReached) hostUnreachable();
+  };
+  // sem resposta em 20 s: a conexão direta não está saindo (às vezes o navegador nem chega a dar "falhou")
+  const timer = setTimeout(() => { if (!m.verified) { fail(); try { conn.close(); } catch {} removeMember(m); } }, 20000);
   // quem liga se apresenta primeiro; quem recebe só responde depois de conferir o código
   conn.on('open', () => { if (outgoing) send(conn, hello()); });
   conn.on('data', d => { if (S.members.get(m.id) === m) onData(m, d, timer); });
   conn.on('close', () => removeMember(m));
-  conn.on('error', () => removeMember(m));
+  conn.on('error', err => {
+    if (err && err.type === 'negotiation-failed') fail();
+    removeMember(m);
+  });
+}
+// a conexão direta com quem criou a sala falhou: avisa e tenta de novo
+function hostUnreachable() {
+  S.hostFails = (S.hostFails || 0) + 1;
+  setStatus(TURN.length
+    ? `Não foi possível conectar com quem criou a sala (tentativa ${S.hostFails}). Tentando de novo…`
+    : `A rede de vocês bloqueou a conexão direta (tentativa ${S.hostFails}). Tentando de novo… Se continuar, tente outra rede (ex.: roteador do celular).`, true);
+  setTimeout(() => { if (S.active && !S.hostReached && S.peer && S.peer.open) connectTo(S.hostId); }, 4000);
 }
 
 function onData(m, d, timer) {

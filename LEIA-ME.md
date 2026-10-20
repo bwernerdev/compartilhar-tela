@@ -52,10 +52,13 @@ Qualquer pessoa da sala pode apresentar. Quando alguém começa, quem estava apr
 
 - A sala depende da aba de quem a criou. Se essa aba fechar, quem já está continua conectado,
   mas ninguém novo entra até ela voltar (reabrindo o mesmo link na mesma aba).
-- Não há servidor TURN (retransmissão). Em algumas redes muito fechadas (empresa, faculdade, alguns 4G/5G
-  com CGNAT) a conexão direta falha e a página fica em “Ainda tentando conectar…”. Nesses casos, tente outra
-  rede. Para funcionar em qualquer rede, seria preciso adicionar um TURN (pago ou próprio) na lista `ICE`
-  no começo do script.
+- Sem servidor TURN (retransmissão), algumas redes bloqueiam a conexão direta: empresa, faculdade,
+  4G/5G e provedores com CGNAT. Nesses casos, quem entra vê “A rede de vocês bloqueou a conexão direta”,
+  e a página tenta de novo sozinha a cada ~25 s. Para funcionar em qualquer rede, preencha a lista `TURN`
+  no começo do script com as credenciais de um provedor de TURN. O ExpressTURN, por exemplo, tem plano
+  grátis de 1000 GB/mês e servidor em São Paulo. Essas credenciais ficam visíveis no código da página.
+- O aviso do Chrome “… está compartilhando sua tela” não pode ser escondido pela página. É uma proteção do
+  navegador. Clique em **Ocultar** para tirá-lo da frente.
 
 ## Testar no próprio PC
 
