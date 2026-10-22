@@ -5,8 +5,28 @@
   (desktopCapturer), então não aparece a barra do Chrome "… está compartilhando sua tela".
   Quem assiste continua usando só o link no navegador; o protocolo da sala não muda.
 */
-const { app, BrowserWindow, Menu, desktopCapturer, dialog, clipboard, ipcMain, screen, session, shell } = require('electron');
+const { app, BrowserWindow, Menu, desktopCapturer, dialog, clipboard, ipcMain, powerSaveBlocker, screen, session, shell } = require('electron');
+const os = require('node:os');
 const path = require('node:path');
+
+// ---------- desempenho ----------
+// A janela do app fica atrás do jogo. Sem isto, o Chromium "economiza" em janela escondida
+// (timers, desenho, captura) e a transmissão engasga.
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+// notebooks com duas placas: usa a dedicada; e aceleração de GPU mesmo em drivers da lista de bloqueio
+app.commandLine.appendSwitch('force_high_performance_gpu');
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('enable-zero-copy');
+
+// prioridade "acima do normal" para todos os processos do app (captura e codificação disputam com o jogo)
+function prioridadeAlta() {
+  for (const m of app.getAppMetrics()) {
+    try { os.setPriority(m.pid, os.constants.priority.PRIORITY_ABOVE_NORMAL); } catch {}
+  }
+}
 
 const SITE_PADRAO = 'https://bwernerdev.github.io/compartilhar-tela/';
 // --site=http://localhost:8765/ abre outra cópia da página (para testar mudanças antes de publicar)
@@ -38,7 +58,7 @@ function criarJanela() {
     width: 1280, height: 800, minWidth: 480, minHeight: 520,
     title: 'Tela Compartilhada', backgroundColor: '#0f1115', show: false,
     icon: path.join(__dirname, 'build', 'icon.png'),
-    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: false },
+    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: false, backgroundThrottling: false },
   });
   janela.once('ready-to-show', () => janela.show());
   janela.on('closed', () => { janela = null; });
@@ -173,5 +193,8 @@ app.whenReady().then(() => {
   ses.setPermissionRequestHandler((wc, permissao, cb) => cb(PERMITIDAS.has(permissao) && doSite(wc.getURL())));
   montarMenu();
   criarJanela();
+  powerSaveBlocker.start('prevent-app-suspension'); // o Windows não suspende o app no meio da transmissão
+  prioridadeAlta();
+  setInterval(prioridadeAlta, 15000); // processos novos (GPU, página) aparecem depois de abrir
 });
 app.on('window-all-closed', () => app.quit());
