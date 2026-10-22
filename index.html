@@ -901,6 +901,9 @@ function onData(m, d) {
     case 'img':
       onImagePart(m, d);
       break;
+    case 'view':
+      onView(m, d);
+      break;
     case 'bye':
       m.left = true;
       try { m.conn.close(); } catch {}
@@ -966,7 +969,11 @@ function acceptCall(m, call) {
   if (kind === 'screen') call.answer(undefined, { sdpTransform: sdp => screenSdp(sdp, call.metadata) }); else call.answer();
   call.on('stream', stream => {
     if (S.members.get(m.id) !== m) return;
-    if (kind === 'screen') { m.screen = stream; m.screenCall = call; m.presenting = true; m.screenAt = Date.now(); }
+    if (kind === 'screen') {
+      m.screen = stream; m.screenCall = call; m.presenting = true; m.screenAt = Date.now();
+      // menos atraso: buffer mínimo de recepção (o navegador ainda aumenta se a rede oscilar)
+      call.peerConnection.getReceivers().forEach(r => { try { if ('jitterBufferTarget' in r) r.jitterBufferTarget = 0; else r.playoutDelayHint = 0; } catch {} });
+    }
     else if (kind === 'cam') { m.cam = stream; m.camCall = call; m.camOn = true; }
     else { m.micCall = call; attachAudio(m, stream); }
     render();
@@ -1025,14 +1032,14 @@ function screenSdp(sdp, meta) {
   return lines.join('\r\n');
 }
 // Libera mais bitrate para o vídeo da tela e diz ao codificador o que preservar quando a rede apertar
-async function tuneSender(sender, scale = 1) {
+async function tuneSender(sender, scale = 1, active = true) {
   const q = QUALITY[S.quality];
   if (!sender.track) return;
   let p;
   try { p = sender.getParameters(); } catch { return; }
   if (!p.encodings || !p.encodings.length) return; // ainda negociando; tenta de novo ao conectar
   if (sender.track.kind === 'video') {
-    Object.assign(p.encodings[0], { maxBitrate: q.maxBitrate, maxFramerate: q.maxFramerate, scaleResolutionDownBy: scale });
+    Object.assign(p.encodings[0], { maxBitrate: q.maxBitrate, maxFramerate: q.maxFramerate, scaleResolutionDownBy: scale, active });
     try { await sender.setParameters({ ...p, degradationPreference: q.degradation }); return; } catch {}
   } else {
     p.encodings[0].maxBitrate = SCREEN_AUDIO_BITRATE;
@@ -1042,11 +1049,56 @@ async function tuneSender(sender, scale = 1) {
 function tuneCall(call) {
   const pc = call.peerConnection;
   if (!pc) return;
-  call._ad = { step: 0, low: 0, high: 0, cool: 0, bytes: null, t: 0 }; // estado do ajuste automático (adaptScreen)
-  const apply = () => pc.getSenders().forEach(s => tuneSender(s, SCALE_STEPS[call._ad.step]));
-  apply();
-  pc.addEventListener('connectionstatechange', () => { if (pc.connectionState === 'connected') apply(); });
+  const m = S.members.get(call.peer);
+  // estado do ajuste automático (adaptScreen) + o que essa pessoa disse que está vendo (mensagem "view")
+  call._ad = { step: 0, low: 0, high: 0, cool: 0, bytes: null, t: 0,
+               watching: !(m && m.view && m.view.watching === false), fit: fitFor(m && m.view) };
+  applyScreen(call);
+  pc.addEventListener('connectionstatechange', () => { if (pc.connectionState === 'connected') applyScreen(call); });
 }
+// escala final = a maior entre o ajuste automático e o tamanho da janela de quem assiste;
+// se a pessoa não está vendo esta tela, o vídeo pausa (o som continua)
+function applyScreen(call) {
+  const ad = call._ad;
+  if (!ad || !call.peerConnection) return;
+  const scale = Math.max(SCALE_STEPS[ad.step], ad.fit || 1);
+  call.peerConnection.getSenders().forEach(s => tuneSender(s, scale, ad.watching !== false));
+}
+// quanto dá para reduzir a captura e ainda cobrir a área do vídeo de quem assiste (1 = resolução cheia)
+function fitFor(view) {
+  const vt = S.screen && S.screen.getVideoTracks()[0];
+  const st = vt && vt.getSettings ? vt.getSettings() : null;
+  if (!view || !view.w || !view.h || !st || !st.width || !st.height) return 1;
+  const f = Math.min(st.width / view.w, st.height / view.h);
+  return f > 1.1 ? Math.round(f * 20) / 20 : 1; // só reduz se sobrar mais de 10%
+}
+// presenter: alguém avisou o que está vendo
+function onView(m, d) {
+  const w = Number(d.w) || 0, h = Number(d.h) || 0;
+  m.view = { watching: d.watching !== false, w: Math.min(Math.max(w, 0), 8000), h: Math.min(Math.max(h, 0), 8000) };
+  const call = S.outCalls.get('screen:' + m.id);
+  if (!call || !call._ad) return;
+  call._ad.watching = m.view.watching;
+  call._ad.fit = fitFor(m.view);
+  applyScreen(call);
+}
+// quem assiste: avisa cada pessoa que apresenta se a tela dela está sendo vista e em que tamanho
+function sendViews() {
+  if (!S.active) return;
+  const visible = document.visibilityState === 'visible' || !!document.pictureInPictureElement;
+  const r = $('stage').getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  // janela flutuante ou tela cheia: pede a resolução cheia
+  const full = !!document.pictureInPictureElement || !!document.fullscreenElement;
+  for (const m of verified()) {
+    if (!m.presenting) { m.sentView = null; continue; }
+    const watching = visible && S.stageStream && m.screen === S.stageStream && !$('stage').hidden;
+    const msg = { t: 'view', watching: !!watching, w: full ? 0 : Math.round(r.width * dpr), h: full ? 0 : Math.round(r.height * dpr) };
+    const key = JSON.stringify(msg);
+    if (m.sentView !== key) { m.sentView = key; send(m.conn, msg); }
+  }
+}
+document.addEventListener('visibilitychange', () => sendViews());
+new ResizeObserver(() => { clearTimeout(S.viewTimer); S.viewTimer = setTimeout(sendViews, 300); }).observe($('stage'));
 function retuneAll() {
   for (const [key, call] of S.outCalls) if (key.startsWith('screen:')) tuneCall(call);
 }
@@ -1194,6 +1246,8 @@ $('btn-full').addEventListener('click', toggleFullscreen);
 $('stage-fs').addEventListener('click', toggleFullscreen);
 $('video').addEventListener('dblclick', toggleFullscreen);
 document.addEventListener('fullscreenchange', render);
+$('video').addEventListener('enterpictureinpicture', () => sendViews());
+$('video').addEventListener('leavepictureinpicture', () => sendViews());
 
 // ---------- painel / chat ----------
 function openPanel(tab) {
@@ -1377,6 +1431,7 @@ function render() {
   $('stage-label').hidden = !owner;
   S.stageLabel = owner ? owner.label : '';
   S.stageMine = !!owner && owner.mine;
+  queueMicrotask(sendViews); // avisa quem apresenta o que estou vendo
   renderLabel();
   $('stage-tools').hidden = !owner;
   $('stage-pip').hidden = !document.pictureInPictureEnabled;
@@ -1475,6 +1530,7 @@ async function updateSendStats() {
   let worst = null;
   for (const [key, call] of S.outCalls) {
     if (!key.startsWith('screen:') || !call.peerConnection) continue;
+    if (call._ad && call._ad.watching === false) continue; // pausado: essa pessoa está vendo outra tela
     try {
       const st = await call.peerConnection.getStats();
       let out = null, availKbps = null, srcFps = null;
@@ -1527,7 +1583,7 @@ function adaptScreen(call, out, availKbps, srcFps) {
   const kbps = ad.bytes != null && now > ad.t ? (bytes - ad.bytes) * 8 / (now - ad.t) : null; // bytes/ms → kbps
   ad.bytes = bytes; ad.t = now;
   if (q.degradation !== 'maintain-framerate') { // Nitidez: resolução fixa
-    if (ad.step) { ad.step = 0; call.peerConnection.getSenders().forEach(s => tuneSender(s, 1)); }
+    if (ad.step) { ad.step = 0; applyScreen(call); }
     return 0;
   }
   if (kbps == null || !out.framesPerSecond) return ad.step;
@@ -1547,7 +1603,7 @@ function adaptScreen(call, out, availKbps, srcFps) {
   else if (ad.high >= (sourceLimited ? 2 : 8) && ad.step > 0) next = ad.step - 1;           // folgado (ou inútil): sobe
   if (next !== ad.step) {
     ad.step = next; ad.low = 0; ad.high = 0; ad.cool = 2;
-    call.peerConnection.getSenders().forEach(s => tuneSender(s, SCALE_STEPS[next]));
+    applyScreen(call);
   }
   return ad.step;
 }

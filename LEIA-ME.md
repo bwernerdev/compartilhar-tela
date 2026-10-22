@@ -51,6 +51,8 @@ quadros para a captura.
 O som do PC vai em estéreo a 128 kbps, sem os filtros de voz.
 
 Várias pessoas podem apresentar ao mesmo tempo. Com mais de uma tela, aparecem botões no topo do vídeo para escolher qual assistir. Por padrão, aparece a tela de quem começou por último.
+A página economiza sozinha: quem apresenta pausa o vídeo para quem está vendo outra tela (o som continua) e manda
+a resolução do tamanho da janela de quem assiste (resolução cheia em tela cheia e na janela flutuante).
 
 ### Anfitrião e sala de espera
 

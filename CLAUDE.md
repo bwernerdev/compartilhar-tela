@@ -61,7 +61,7 @@ textos de interface, comentários e commits são em português.
 - **Malha:** quem liga manda `hello{v,code,name,at,mic,cam,presenting}`. Quem recebe só aceita se o id
   estiver em `S.admitted`, que é preenchido pela mensagem `admit{id}` do anfitrião. Até lá, guarda o
   `pendingHello`.
-- **Mensagens de membro (`onData`):** `admit`, `room{host,approval}`, `kick{id}`, `state`, `present` (só avisa: várias telas podem coexistir, escolhidas por `S.pinned` no `render`),
+- **Mensagens de membro (`onData`):** `admit`, `room{host,approval}`, `kick{id}`, `state`, `view{watching,w,h}` (quem assiste → quem apresenta: `onView` pausa `active=false` ou ajusta a escala por `fitFor`; enviado por `sendViews`), `present` (só avisa: várias telas podem coexistir, escolhidas por `S.pinned` no `render`),
   `present`, `chat`, `img{id,i,n,d}` (pedaços de ≤15 000 caracteres), `bye`.
 - **Mídia:** `peer.call` com `metadata.kind` = `screen`, `mic` ou `cam`, mais `codec` e `startKbps`
   na tela. Quem recebe responde com `answer()`, sem stream.
