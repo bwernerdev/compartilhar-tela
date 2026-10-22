@@ -50,7 +50,7 @@ quadros para a captura.
 
 O som do PC vai em estéreo a 128 kbps, sem os filtros de voz.
 
-Qualquer pessoa da sala pode apresentar. Quando alguém começa, quem estava apresentando para.
+Várias pessoas podem apresentar ao mesmo tempo. Com mais de uma tela, aparecem botões no topo do vídeo para escolher qual assistir. Por padrão, aparece a tela de quem começou por último.
 
 ### Anfitrião e sala de espera
 

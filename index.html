@@ -81,6 +81,10 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
 .stage-empty .big svg{width:26px;height:26px}
 .stage-empty h2{color:var(--text);font-size:18px;margin:0 0 6px;font-weight:600}
 .stage-label{position:absolute;left:12px;bottom:12px;background:rgba(0,0,0,.6);padding:6px 10px;border-radius:8px;font-size:13px;max-width:calc(100% - 80px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.screen-tabs{position:absolute;top:12px;left:12px;right:12px;display:flex;flex-wrap:wrap;gap:6px;z-index:1}
+.stab{padding:6px 12px;border-radius:999px;background:rgba(0,0,0,.6);color:#fff;font-size:13px;font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stab:hover{background:rgba(0,0,0,.8)}
+.stab.on{background:var(--accent);color:var(--accent-ink)}
 .stage-tools{position:absolute;right:10px;bottom:10px;display:flex;gap:8px;align-items:center}
 .stage-btn{width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.6);display:grid;place-items:center;color:#fff}
 .stage-btn:hover{background:rgba(0,0,0,.8)}
@@ -295,6 +299,7 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
         <h2>Ninguém está apresentando</h2>
         <div id="stage-hint">Clique em <b>Apresentar</b> para mostrar sua tela.</div>
       </div>
+      <div class="screen-tabs" id="screen-tabs" hidden aria-label="Escolher qual tela ver"></div>
       <div class="stage-label" id="stage-label" hidden></div>
       <div class="stage-tools" id="stage-tools" hidden>
         <span class="svol" id="svol" hidden><svg><use href="#i-vol"/></svg><input type="range" id="stage-vol" min="0" max="1" step="0.05" value="1" aria-label="Volume da tela compartilhada"></span>
@@ -886,8 +891,8 @@ function onData(m, d) {
       render();
       break;
     case 'present':
-      m.presenting = true;
-      if (S.screen) stopPresenting(`${m.name} começou a apresentar`);
+      m.presenting = true; // não derruba a tela de ninguém: dá para ter várias e escolher qual ver
+      toast(`${m.name} começou a apresentar`);
       render();
       break;
     case 'chat':
@@ -1086,6 +1091,7 @@ async function startPresenting() {
   if (!S.active) { stream.getTracks().forEach(t => t.stop()); return; }
   if (S.screen) S.screen.getTracks().forEach(t => t.stop());
   S.screen = stream;
+  S.screenAt = Date.now();
   const vt = stream.getVideoTracks()[0];
   if (vt) {
     vt.contentHint = QUALITY[S.quality].hint;
@@ -1342,11 +1348,19 @@ function render() {
   const total = others.length + 1;
 
   // palco: quem está apresentando
-  let owner = null;
-  if (S.screen) owner = { key: 'me', stream: S.screen, label: 'Você está apresentando. Todos na sala veem esta tela.', mine: true };
-  else {
-    const p = others.filter(m => m.screen).sort((a, b) => (b.screenAt || 0) - (a.screenAt || 0))[0];
-    if (p) owner = { key: p.id + ':' + p.screen.id, stream: p.screen, label: `Tela de ${p.name}`, mine: false };
+  // várias pessoas podem apresentar ao mesmo tempo: mostra a escolhida (S.pinned) ou a mais recente dos outros
+  const screens = others.filter(m => m.screen).map(m => ({ key: m.id, stream: m.screen, label: `Tela de ${m.name}`, name: m.name, mine: false, at: m.screenAt || 0 }));
+  if (S.screen) screens.push({ key: 'me', stream: S.screen, label: 'Você está apresentando. Todos na sala veem esta tela.', name: 'Sua tela', mine: true, at: S.screenAt || 0 });
+  const owner = screens.find(s => s.key === S.pinned)
+    || screens.filter(s => !s.mine).sort((a, b) => b.at - a.at)[0] || screens[0] || null;
+  const tabs = $('screen-tabs');
+  tabs.textContent = '';
+  tabs.hidden = screens.length < 2;
+  if (screens.length > 1) for (const s of screens) {
+    const b = el('button', 'stab' + (s === owner ? ' on' : '')); b.type = 'button';
+    b.textContent = s.name; b.title = s.mine ? 'Ver a sua tela' : `Ver a tela de ${s.name}`;
+    b.addEventListener('click', () => { S.pinned = s.key; render(); });
+    tabs.append(b);
   }
   const v = $('video');
   // compara o próprio stream: uma nova chamada da mesma pessoa pode vir com o mesmo id
@@ -1362,6 +1376,7 @@ function render() {
   $('stage-empty').hidden = !!owner;
   $('stage-label').hidden = !owner;
   S.stageLabel = owner ? owner.label : '';
+  S.stageMine = !!owner && owner.mine;
   renderLabel();
   $('stage-tools').hidden = !owner;
   $('stage-pip').hidden = !document.pictureInPictureEnabled;
@@ -1438,7 +1453,7 @@ function render() {
 function renderLabel() {
   const v = $('video'), el = $('stage-label');
   let text = S.stageLabel;
-  if (text && S.screen && S.send) {
+  if (text && S.stageMine && S.send) {
     // quem apresenta vê o que está saindo de verdade e o que está segurando a qualidade
     const s = S.send;
     text = 'Você está apresentando · enviando ' + (s.w ? `${s.w}×${s.h} ` : '') + `${s.fps} qps`
@@ -1448,7 +1463,7 @@ function renderLabel() {
       + (s.hw === false ? ' · codificando no processador' : '');
   } else if (text && v.videoWidth) {
     text += ` · ${v.videoWidth}×${v.videoHeight}`;
-    const p = !S.screen && verified().find(m => m.screen === S.stageStream);
+    const p = !S.stageMine && verified().find(m => m.screen === S.stageStream);
     if (p && p.net && p.net.fps) text += ` ${p.net.fps} qps`;
   }
   el.textContent = text;
